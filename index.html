@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Prototype — roguelite</title>
+<link rel="stylesheet" href="styles/app.css">
+</head>
+<body>
+
+<div id="app"></div>
+
+<noscript>
+  <p style="padding:2rem">Ce prototype a besoin de JavaScript.</p>
+</noscript>
+
+<script>
+  // Les modules ES sont bloqués quand la page est ouverte en file://.
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      if (!window.__appChargee && location.protocol === 'file:') {
+        document.getElementById('app').innerHTML =
+          '<div class="ecran accueil"><div><h1>Serveur requis</h1>' +
+          '<p class="note" style="max-width:32rem">Le navigateur bloque les modules JavaScript quand la page est ' +
+          'ouverte directement depuis le disque. Ouvre un terminal dans ce dossier et lance ' +
+          '<code>python3 -m http.server 8000</code>, puis va sur <code>http://localhost:8000</code>.</p></div></div>';
+      }
+    }, 600);
+  });
+</script>
+
+<script type="module">
+  window.__appChargee = true;
+  import('./src/ui/app.js');
+</script>
+
+</body>
+</html>
