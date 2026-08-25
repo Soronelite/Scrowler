@@ -10,6 +10,7 @@ import { RACES, SEXES, CLASSES } from '../data/personnage.js';
 import {
   STATS,
   STAT_MIN,
+  minimumDe,
   STAT_MAX,
   POINTS_A_REPARTIR,
   statsParDefaut,
@@ -77,7 +78,9 @@ export function ecranCreation({ onLancer, onRetour }) {
 
     for (const stat of STATS) {
       const valeur = brouillon.stats[stat.id];
-      const peutBaisser = valeur > STAT_MIN;
+      // Chaque statistique a son propre plancher : l'Endurance démarre à 0.
+      const minimum = minimumDe(stat.id);
+      const peutBaisser = valeur > minimum;
       const peutMonter = valeur < STAT_MAX && restants > 0;
 
       const moins = el('button', {
@@ -114,7 +117,7 @@ export function ecranCreation({ onLancer, onRetour }) {
         Array.from({ length: STAT_MAX }, (_, i) => {
           const rang = i + 1;
           const classe =
-            rang <= STAT_MIN && rang <= valeur
+            rang <= minimum && rang <= valeur
               ? 'cran plein'
               : rang <= valeur
                 ? 'cran bonus'

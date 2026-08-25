@@ -172,8 +172,17 @@ suite('Ceinture et emplacements rapides', ({ test }) => {
     const p = nu();
     p.equipement.ceinture = Eq.instancier('ceinture_cuir');
     Portage.resynchroniser(p);
-    const uid = Inv.ajouter(p.sac, 'parchemin_boule_feu').uid;
+    // La torche fait 1×2 : elle ne tient pas en emplacement rapide.
+    const uid = Inv.ajouter(p.sac, 'torche').uid;
     expect(Portage.mettreEnRapide(p, uid, 0).ok).toBe(false);
+  });
+
+  test('le parchemin tient désormais en emplacement rapide', () => {
+    const p = nu();
+    p.equipement.ceinture = Eq.instancier('ceinture_cuir');
+    Portage.resynchroniser(p);
+    const uid = Inv.ajouter(p.sac, 'parchemin_boule_feu').uid;
+    expect(Portage.mettreEnRapide(p, uid, 0).ok).toBe(true);
   });
 
   test('changer pour une ceinture plus courte rend le surplus', () => {

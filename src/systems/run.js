@@ -263,6 +263,9 @@ export function actionsDeRencontre(run) {
     objetId: id,
   }));
 
+  // Pendant un combat, aucune action de rencontre : ni fouille, ni avancée.
+  if (run.phase === PHASES.COMBAT) return [];
+
   const actions = [];
   const ennemiPresent = Boolean(etat.ennemi) && run.phase === PHASES.EXPLORATION;
 
@@ -573,9 +576,19 @@ function consommerAction(run, cout) {
 export function objetsUtilisables(run) {
   const enCombat = run.phase === PHASES.COMBAT;
 
-  // Seuls les objets équipés ou en emplacement rapide sont utilisables :
-  // le contenu du sac n'agit pas.
-  return Portage.actionsDisponibles(run.personnage.portage)
+  // En combat, seuls les objets équipés ou en emplacement rapide servent :
+  // fouiller son sac au milieu d'un échange n'a pas de sens.
+  // Hors combat, le contenu du sac redevient utilisable.
+  const portes = [...Portage.actionsDisponibles(run.personnage.portage)];
+
+  if (!enCombat) {
+    for (const slot of run.personnage.portage.sac.contenu) {
+      const def = objet(slot.objetId);
+      if (def.action && !slot.brise) portes.push({ instance: slot, zone: 'sac' });
+    }
+  }
+
+  return portes
     .map((porte) => ({ slot: porte.instance, def: objet(porte.instance.objetId), zone: porte.zone }))
     .filter(({ def }) => {
       const a = def.action;
@@ -596,7 +609,8 @@ export function utiliserObjet(run, uid) {
   const position = Portage.localiser(run.personnage.portage, uid);
   if (!position) return;
   const instance = position.instance ?? position.slot;
-  if (position.zone === 'sac') return; // le sac ne sert qu'au transport
+  // Le sac n'est accessible qu'en dehors d'un combat.
+  if (position.zone === 'sac' && run.phase === PHASES.COMBAT) return;
   if (instance.brise) return;
 
   const def = objet(instance.objetId);

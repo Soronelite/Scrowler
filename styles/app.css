@@ -342,6 +342,73 @@ input[type="text"] {
 .plein-ecran header h2 { font-size: 1.5rem; }
 .plein-ecran header .etiquette { margin-left: auto; }
 
+/*
+ * Inventaire : en-tête et pied figés, seul le corps défile. Le pied faisait
+ * auparavant partie du flux défilant et sortait de l'écran sur téléphone.
+ */
+.plein-ecran.inventaire {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+.inv-entete {
+  flex: 0 0 auto;
+  padding: calc(0.9rem + env(safe-area-inset-top)) 1rem 0.7rem;
+  border-bottom: 1px solid var(--ink-800);
+}
+.inv-corps {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.9rem 1rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.inv-pied {
+  flex: 0 0 auto;
+  padding: 0.8rem 1rem calc(0.8rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--ink-700);
+  background: var(--ink-900);
+  display: flex;
+  gap: 0.7rem;
+}
+.inv-pied > * { flex: 1; }
+
+/* Cibles de dépôt pendant un glissé */
+.slot.survole, .rapide.survole {
+  border-color: var(--gain);
+  box-shadow: inset 0 0 0 1px var(--gain);
+}
+.slot.refuse, .rapide.refuse {
+  border-color: var(--loss);
+  box-shadow: inset 0 0 0 1px var(--loss);
+}
+.slot, .rapide { cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; }
+.slot.rempli, .rapide.rempli { cursor: grab; }
+
+/* Statut de la pièce */
+.statuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: center;
+  margin-top: 0.7rem;
+}
+.statut {
+  font-family: var(--mono);
+  font-size: 0.63rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--ink-600);
+  border-radius: 999px;
+  color: var(--bone-dim);
+}
+.statut.lumiere { color: var(--brass); border-color: var(--brass-deep); }
+
 .grille-zone { display: flex; justify-content: center; }
 
 .grille {
@@ -361,6 +428,7 @@ input[type="text"] {
 
 .objet {
   position: absolute;
+  touch-action: none;
   border-radius: 3px;
   background: var(--ink-700);
   border: 1px solid var(--ink-600);

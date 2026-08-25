@@ -304,7 +304,7 @@ export const OBJETS = [
     categorie: 'consommable',
     rarete: 'peu_commun',
     icone: '📜',
-    forme: { l: 1, h: 2 },
+    forme: { l: 1, h: 1 },
     usure: { max: 1, detruitAZero: true },
     action: { type: 'degats', verbe: 'Lancer', des: '2d6', cout: 1, cible: 'ennemi' },
   },

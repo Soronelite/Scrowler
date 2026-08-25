@@ -1,18 +1,19 @@
 /**
  * vue-inventaire.js — Inventaire plein écran.
  *
- * Trois zones : les emplacements d'équipement, les emplacements rapides de la
- * ceinture, et la grille du sac.
+ * Trois zones : équipement, emplacements rapides de ceinture, sac.
+ * Un objet se glisse librement d'une zone à l'autre.
  *
- * Un appui bref sélectionne, un glissé déplace dans la grille. Les
- * changements de zone (équiper, mettre à la ceinture, ranger) passent par les
- * boutons de la fiche : c'est plus fiable au doigt qu'un glissé inter-zones.
+ * Le glissé est piloté par des écouteurs posés sur `window`, jamais sur le
+ * nœud tiré : un re-rendu peut détruire ce nœud en cours de route, et les
+ * événements suivants seraient alors perdus — c'est ce qui laissait un objet
+ * fantôme en lévitation sur tous les écrans.
  */
 
 import { el, vider } from './dom.js';
 import { objet, estPivotable } from '../data/objets.js';
 import { RARETE_PAR_ID } from '../data/personnage.js';
-import { EMPLACEMENTS, MAINS } from '../data/emplacements.js';
+import { EMPLACEMENTS } from '../data/emplacements.js';
 import * as Inv from '../systems/inventaire.js';
 import * as Eq from '../systems/equipement.js';
 import * as Portage from '../systems/portage.js';
@@ -29,11 +30,7 @@ export function vueInventaire({ portage, onFermer, onUtiliser, onJeter, utilisab
   const fiche = el('div', { class: 'bloc fiche' });
   const message = el('p', { class: 'note' });
 
-  const racine = el('div', { class: 'plein-ecran' }, [
-    el('header', {}, [
-      el('h2', { text: 'Équipement' }),
-      el('span', { class: 'etiquette', id: 'inv-libre' }),
-    ]),
+  const corps = el('div', { class: 'inv-corps' }, [
     zoneEquipement,
     el('h3', { class: 'sous-titre-inv', text: 'Emplacements rapides' }),
     zoneCeinture,
@@ -41,7 +38,15 @@ export function vueInventaire({ portage, onFermer, onUtiliser, onJeter, utilisab
     el('div', { class: 'grille-zone' }, [grille]),
     fiche,
     message,
-    el('div', { class: 'barre-bas' }, [
+  ]);
+
+  const racine = el('div', { class: 'plein-ecran inventaire' }, [
+    el('header', { class: 'inv-entete' }, [
+      el('h2', { text: 'Équipement' }),
+      el('span', { class: 'etiquette', id: 'inv-libre' }),
+    ]),
+    corps,
+    el('div', { class: 'inv-pied' }, [
       el('button', { class: 'primaire', text: 'Fermer', onclick: onFermer }),
     ]),
   ]);
@@ -52,7 +57,66 @@ export function vueInventaire({ portage, onFermer, onUtiliser, onJeter, utilisab
     signaler.minuteur = setTimeout(() => { message.textContent = ''; }, 2600);
   }
 
-  /* ---------------- équipement ---------------- */
+  const sac = () => portage.sac;
+
+  /* ------------------------------------------------------------------ */
+  /* Déplacement d'un objet vers une zone                                */
+  /* ------------------------------------------------------------------ */
+
+  function deposer(uid, cible) {
+    let resultat;
+
+    if (cible.zone === 'equipement') {
+      resultat = Portage.equiper(portage, uid, cible.emplacementId);
+    } else if (cible.zone === 'raccourci') {
+      resultat = Portage.mettreEnRapide(portage, uid, cible.index);
+    } else if (cible.zone === 'sac') {
+      resultat = versLeSac(uid, cible);
+    } else {
+      return false;
+    }
+
+    if (!resultat.ok) {
+      signaler(resultat.raison);
+      return false;
+    }
+    for (const reste of resultat.expulses ?? []) {
+      signaler(`${objet(reste.objetId).nom} ne rentre plus dans le sac.`);
+    }
+    return true;
+  }
+
+  /** Vers le sac : déplacement interne si l'objet y est déjà, sinon transfert. */
+  function versLeSac(uid, cible) {
+    const position = Portage.localiser(portage, uid);
+    if (!position) return { ok: false, raison: 'Objet introuvable.' };
+
+    if (position.zone === 'sac') {
+      const slot = position.slot;
+      const ok = cible.x === undefined
+        ? true
+        : Inv.deplacer(sac(), uid, cible.x, cible.y, slot.pivote);
+      return ok ? { ok: true } : { ok: false, raison: 'Pas de place à cet endroit.' };
+    }
+
+    const instance = position.instance;
+    const place = cible.x === undefined
+      ? Inv.trouverPlace(sac(), instance.objetId)
+      : (Inv.peutPlacer(sac(), instance.objetId, cible.x, cible.y, false)
+          ? { x: cible.x, y: cible.y, pivote: false }
+          : Inv.trouverPlace(sac(), instance.objetId));
+
+    if (!place) return { ok: false, raison: 'Le sac est plein.' };
+
+    Portage.extraire(portage, uid);
+    Inv.poser(sac(), instance, place.x, place.y, place.pivote);
+    const expulses = Portage.resynchroniser(portage);
+    return { ok: true, expulses };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Rendu                                                               */
+  /* ------------------------------------------------------------------ */
 
   function rendreEquipement() {
     vider(zoneEquipement);
@@ -63,20 +127,15 @@ export function vueInventaire({ portage, onFermer, onUtiliser, onJeter, utilisab
       const def = instance ? objet(instance.objetId) : null;
 
       const noeud = el(
-        'button',
+        'div',
         {
           class: `slot${instance ? ' rempli' : ''}${grisee ? ' grise' : ''}` +
                  `${selection === instance?.uid ? ' selectionne' : ''}`,
-          disabled: grisee,
+          role: 'button',
+          tabindex: '0',
+          'data-zone': 'equipement',
+          'data-emplacement': emplacement.id,
           title: grisee ? 'Occupée par une arme à deux mains' : emplacement.nom,
-          onclick: () => {
-            if (instance) {
-              selection = selection === instance.uid ? null : instance.uid;
-              rendre();
-            } else if (selection) {
-              tenterEquiper(selection, emplacement.id);
-            }
-          },
         },
         [
           el('span', { class: 'slot-nom', text: emplacement.nom }),
@@ -85,27 +144,25 @@ export function vueInventaire({ portage, onFermer, onUtiliser, onJeter, utilisab
             class: 'slot-objet',
             text: grisee ? '— deux mains —' : def ? def.nom : 'vide',
           }),
-          instance && instance.brise ? el('span', { class: 'brise', text: 'BRISÉ' }) : null,
+          instance?.brise ? el('span', { class: 'brise', text: 'BRISÉ' }) : null,
         ]
       );
+
+      if (instance && !grisee) {
+        noeud.addEventListener('pointerdown', (e) =>
+          commencer(e, instance, noeud, { zone: 'equipement', emplacementId: emplacement.id })
+        );
+      } else if (!grisee) {
+        noeud.addEventListener('click', () => {
+          if (selection && deposer(selection, { zone: 'equipement', emplacementId: emplacement.id })) {
+            selection = null;
+          }
+          rendre();
+        });
+      }
       zoneEquipement.append(noeud);
     }
   }
-
-  function tenterEquiper(uid, emplacementId) {
-    const resultat = Portage.equiper(portage, uid, emplacementId);
-    if (!resultat.ok) {
-      signaler(resultat.raison);
-      return;
-    }
-    for (const reste of resultat.expulses ?? []) {
-      signaler(`${objet(reste.objetId).nom} ne rentre plus dans le sac.`);
-    }
-    selection = null;
-    rendre();
-  }
-
-  /* ---------------- ceinture ---------------- */
 
   function rendreCeinture() {
     vider(zoneCeinture);
@@ -121,37 +178,39 @@ export function vueInventaire({ portage, onFermer, onUtiliser, onJeter, utilisab
       const instance = emplacement.contenu;
       const def = instance ? objet(instance.objetId) : null;
 
-      zoneCeinture.append(
-        el(
-          'button',
-          {
-            class: `rapide${instance ? ' rempli' : ''}${emplacement.type === 'potion' ? ' potion' : ''}` +
-                   `${selection === instance?.uid ? ' selectionne' : ''}`,
-            title: emplacement.type === 'potion' ? 'Potions uniquement' : 'Emplacement rapide',
-            onclick: () => {
-              if (instance) {
-                selection = selection === instance.uid ? null : instance.uid;
-                rendre();
-              } else if (selection) {
-                const r = Portage.mettreEnRapide(portage, selection, index);
-                if (!r.ok) signaler(r.raison);
-                else selection = null;
-                rendre();
-              }
-            },
-          },
-          [
-            el('span', { class: 'slot-icone', text: def ? def.icone : emplacement.type === 'potion' ? '⚗️' : '·' }),
-            el('span', { class: 'slot-objet', text: def ? def.nom : 'vide' }),
-          ]
-        )
+      const noeud = el(
+        'div',
+        {
+          class: `rapide${instance ? ' rempli' : ''}${emplacement.type === 'potion' ? ' potion' : ''}` +
+                 `${selection === instance?.uid ? ' selectionne' : ''}`,
+          role: 'button',
+          tabindex: '0',
+          'data-zone': 'raccourci',
+          'data-index': String(index),
+          title: emplacement.type === 'potion' ? 'Potions uniquement' : 'Emplacement rapide',
+        },
+        [
+          el('span', {
+            class: 'slot-icone',
+            text: def ? def.icone : emplacement.type === 'potion' ? '⚗️' : '+',
+          }),
+          el('span', { class: 'slot-objet', text: def ? def.nom : 'vide' }),
+        ]
       );
+
+      if (instance) {
+        noeud.addEventListener('pointerdown', (e) =>
+          commencer(e, instance, noeud, { zone: 'raccourci', index })
+        );
+      } else {
+        noeud.addEventListener('click', () => {
+          if (selection && deposer(selection, { zone: 'raccourci', index })) selection = null;
+          rendre();
+        });
+      }
+      zoneCeinture.append(noeud);
     });
   }
-
-  /* ---------------- sac ---------------- */
-
-  const sac = () => portage.sac;
 
   function tailleCase() {
     const rect = grille.getBoundingClientRect();
@@ -190,24 +249,28 @@ export function vueInventaire({ portage, onFermer, onUtiliser, onJeter, utilisab
           el('span', { class: 'nom', text: def.nom }),
         ]
       );
-      noeud.addEventListener('pointerdown', (e) => commencer(e, slot, noeud));
+      noeud.addEventListener('pointerdown', (e) => commencer(e, slot, noeud, { zone: 'sac' }));
       grille.append(noeud);
       positionner(noeud, slot);
     }
 
     const libres = Inv.casesLibres(sac());
     racine.querySelector('#inv-libre').textContent =
-      `sac ${sac().largeur}×${sac().hauteur} — ${libres} case${libres > 1 ? 's' : ''} libre${libres > 1 ? 's' : ''}`;
+      `sac ${sac().largeur}×${sac().hauteur} — ${libres} libre${libres > 1 ? 's' : ''}`;
   }
 
-  /* ---------------- fiche ---------------- */
+  /* ------------------------------------------------------------------ */
+  /* Fiche                                                               */
+  /* ------------------------------------------------------------------ */
 
   function rendreFiche() {
     vider(fiche);
     const position = selection ? Portage.localiser(portage, selection) : null;
 
     if (!position) {
-      fiche.append(el('p', { class: 'vide', text: 'Aucun objet sélectionné.' }));
+      fiche.append(
+        el('p', { class: 'vide', text: 'Touche un objet, ou glisse-le d’une zone à l’autre.' })
+      );
       return;
     }
 
@@ -226,7 +289,7 @@ export function vueInventaire({ portage, onFermer, onUtiliser, onJeter, utilisab
 
     const actions = el('div', { class: 'rangee' });
 
-    if (def.action && position.zone !== 'sac' && !instance.brise) {
+    if (def.action && !instance.brise) {
       const permis = utilisableMaintenant(def, position);
       actions.append(
         el('button', {
@@ -238,7 +301,6 @@ export function vueInventaire({ portage, onFermer, onUtiliser, onJeter, utilisab
       );
     }
 
-    // Équiper : un bouton par emplacement compatible et libre.
     if (position.zone !== 'equipement') {
       for (const emplacement of EMPLACEMENTS) {
         if (!emplacement.accepte.includes(def.port)) continue;
@@ -247,34 +309,41 @@ export function vueInventaire({ portage, onFermer, onUtiliser, onJeter, utilisab
         actions.append(
           el('button', {
             text: `→ ${emplacement.nom}`,
-            onclick: () => tenterEquiper(instance.uid, emplacement.id),
+            onclick: () => {
+              if (deposer(instance.uid, { zone: 'equipement', emplacementId: emplacement.id })) {
+                selection = null;
+              }
+              rendre();
+            },
           })
         );
       }
     }
 
-    if (position.zone === 'equipement') {
-      actions.append(
-        el('button', {
-          text: 'Ranger dans le sac',
-          onclick: () => {
-            const r = Portage.desequiper(portage, position.emplacementId);
-            if (!r.ok) signaler(r.raison);
-            else selection = null;
-            rendre();
-          },
-        })
+    // Vers la ceinture : premier emplacement rapide compatible et libre.
+    if (position.zone !== 'raccourci') {
+      const libre = portage.raccourcis.findIndex(
+        (e, i) => !e.contenu && Eq.peutMettreEnRapide(e.type, instance.objetId).ok
       );
+      if (libre !== -1) {
+        actions.append(
+          el('button', {
+            text: '→ Ceinture',
+            onclick: () => {
+              if (deposer(instance.uid, { zone: 'raccourci', index: libre })) selection = null;
+              rendre();
+            },
+          })
+        );
+      }
     }
 
-    if (position.zone === 'raccourci') {
+    if (position.zone !== 'sac') {
       actions.append(
         el('button', {
-          text: 'Ranger dans le sac',
+          text: '→ Sac',
           onclick: () => {
-            const r = Portage.retirerDuRapide(portage, position.index);
-            if (!r.ok) signaler(r.raison);
-            else selection = null;
+            if (deposer(instance.uid, { zone: 'sac' })) selection = null;
             rendre();
           },
         })
@@ -317,25 +386,37 @@ export function vueInventaire({ portage, onFermer, onUtiliser, onJeter, utilisab
     if (actions.children.length) fiche.append(actions);
   }
 
-  /* ---------------- glissé dans le sac ---------------- */
+  /* ------------------------------------------------------------------ */
+  /* Glissé, toutes zones                                                */
+  /* ------------------------------------------------------------------ */
 
   let drag = null;
 
-  function commencer(evenement, slot, noeud) {
+  function commencer(evenement, instance, noeud, origine) {
     if (evenement.button !== undefined && evenement.button !== 0) return;
     evenement.preventDefault();
+    annulerDrag();
+
     const rect = noeud.getBoundingClientRect();
     drag = {
-      slot, noeud,
+      uid: instance.uid,
+      objetId: instance.objetId,
+      pivote: instance.pivote ?? false,
+      origine,
       depart: { x: evenement.clientX, y: evenement.clientY },
       decalage: { x: evenement.clientX - rect.left, y: evenement.clientY - rect.top },
       taille: { l: rect.width, h: rect.height },
-      actif: false, flottant: null,
+      apercu: noeud.cloneNode(true),
+      noeud,
+      actif: false,
+      flottant: null,
     };
-    noeud.setPointerCapture(evenement.pointerId);
-    noeud.addEventListener('pointermove', bouger);
-    noeud.addEventListener('pointerup', relacher);
-    noeud.addEventListener('pointercancel', annuler);
+
+    // Écouteurs sur window : le nœud d'origine peut disparaître à tout moment.
+    window.addEventListener('pointermove', bouger);
+    window.addEventListener('pointerup', relacher);
+    window.addEventListener('pointercancel', annulerDrag);
+    window.addEventListener('blur', annulerDrag);
   }
 
   function bouger(evenement) {
@@ -347,7 +428,7 @@ export function vueInventaire({ portage, onFermer, onUtiliser, onJeter, utilisab
     if (!drag.actif) {
       drag.actif = true;
       drag.noeud.classList.add('fantome');
-      const clone = drag.noeud.cloneNode(true);
+      const clone = drag.apercu;
       clone.classList.remove('fantome', 'selectionne');
       clone.classList.add('objet-flottant');
       clone.style.width = `${drag.taille.l}px`;
@@ -355,64 +436,116 @@ export function vueInventaire({ portage, onFermer, onUtiliser, onJeter, utilisab
       document.body.append(clone);
       drag.flottant = clone;
     }
+
     drag.flottant.style.left = `${evenement.clientX - drag.decalage.x}px`;
     drag.flottant.style.top = `${evenement.clientY - drag.decalage.y}px`;
     surligner(evenement);
   }
 
-  function caseVisee(evenement) {
-    const rect = grille.getBoundingClientRect();
-    const c = tailleCase();
-    return {
-      x: Math.round((evenement.clientX - drag.decalage.x - rect.left - 4) / (c + 4)),
-      y: Math.round((evenement.clientY - drag.decalage.y - rect.top - 4) / (c + 4)),
-    };
+  /** Zone survolée, d'après l'élément sous le curseur. */
+  function cibleSous(evenement) {
+    const rectGrille = grille.getBoundingClientRect();
+    const dansGrille =
+      evenement.clientX >= rectGrille.left && evenement.clientX <= rectGrille.right &&
+      evenement.clientY >= rectGrille.top && evenement.clientY <= rectGrille.bottom;
+
+    if (dansGrille) {
+      const c = tailleCase();
+      return {
+        zone: 'sac',
+        x: Math.round((evenement.clientX - drag.decalage.x - rectGrille.left - 4) / (c + 4)),
+        y: Math.round((evenement.clientY - drag.decalage.y - rectGrille.top - 4) / (c + 4)),
+      };
+    }
+
+    const sous = document.elementFromPoint(evenement.clientX, evenement.clientY);
+    const hote = sous?.closest('[data-zone]');
+    if (!hote) return null;
+
+    if (hote.dataset.zone === 'equipement') {
+      return { zone: 'equipement', emplacementId: hote.dataset.emplacement, noeud: hote };
+    }
+    if (hote.dataset.zone === 'raccourci') {
+      return { zone: 'raccourci', index: Number(hote.dataset.index), noeud: hote };
+    }
+    return null;
   }
 
   function surligner(evenement) {
-    const cellules = grille.querySelectorAll('.case');
-    for (const c of cellules) c.classList.remove('cible-ok', 'cible-non');
-    const { x, y } = caseVisee(evenement);
-    const possible = Inv.peutPlacer(sac(), drag.slot.objetId, x, y, drag.slot.pivote, drag.slot.uid);
-    const f = Inv.forme(drag.slot.objetId, drag.slot.pivote);
-    for (let dy = 0; dy < f.h; dy++) {
-      for (let dx = 0; dx < f.l; dx++) {
-        const cx = x + dx, cy = y + dy;
-        if (cx < 0 || cy < 0 || cx >= sac().largeur || cy >= sac().hauteur) continue;
-        cellules[cy * sac().largeur + cx]?.classList.add(possible ? 'cible-ok' : 'cible-non');
+    for (const c of grille.querySelectorAll('.case')) c.classList.remove('cible-ok', 'cible-non');
+    for (const s of racine.querySelectorAll('[data-zone]')) s.classList.remove('survole', 'refuse');
+
+    const cible = cibleSous(evenement);
+    if (!cible) return;
+
+    if (cible.zone === 'sac') {
+      const cellules = grille.querySelectorAll('.case');
+      const interne = drag.origine.zone === 'sac';
+      const possible = Inv.peutPlacer(
+        sac(), drag.objetId, cible.x, cible.y, drag.pivote, interne ? drag.uid : null
+      );
+      const f = Inv.forme(drag.objetId, drag.pivote);
+      for (let dy = 0; dy < f.h; dy++) {
+        for (let dx = 0; dx < f.l; dx++) {
+          const cx = cible.x + dx;
+          const cy = cible.y + dy;
+          if (cx < 0 || cy < 0 || cx >= sac().largeur || cy >= sac().hauteur) continue;
+          cellules[cy * sac().largeur + cx]?.classList.add(possible ? 'cible-ok' : 'cible-non');
+        }
       }
+      return;
     }
+
+    const verdict = cible.zone === 'equipement'
+      ? Eq.peutEquiper(portage.equipement, drag.objetId, cible.emplacementId)
+      : Eq.peutMettreEnRapide(portage.raccourcis[cible.index]?.type, drag.objetId);
+    cible.noeud.classList.add(verdict.ok ? 'survole' : 'refuse');
   }
 
   function relacher(evenement) {
     if (!drag) return;
-    const { slot, actif } = drag;
-    if (actif) {
-      const { x, y } = caseVisee(evenement);
-      Inv.deplacer(sac(), slot.uid, x, y, slot.pivote);
-    } else {
-      selection = selection === slot.uid ? null : slot.uid;
+    const { uid, actif } = drag;
+    const cible = actif ? cibleSous(evenement) : null;
+
+    nettoyer();
+
+    if (!actif) {
+      selection = selection === uid ? null : uid;
+    } else if (cible) {
+      if (deposer(uid, cible)) selection = null;
     }
+    rendre();
+  }
+
+  function annulerDrag() {
+    if (!drag) return;
     nettoyer();
     rendre();
   }
 
-  function annuler() { nettoyer(); rendre(); }
-
+  /** Retire le fantôme et TOUS les écouteurs, quoi qu'il arrive. */
   function nettoyer() {
     if (!drag) return;
     drag.flottant?.remove();
-    drag.noeud.classList.remove('fantome');
-    drag.noeud.removeEventListener('pointermove', bouger);
-    drag.noeud.removeEventListener('pointerup', relacher);
-    drag.noeud.removeEventListener('pointercancel', annuler);
+    drag.noeud?.classList.remove('fantome');
     drag = null;
+
+    window.removeEventListener('pointermove', bouger);
+    window.removeEventListener('pointerup', relacher);
+    window.removeEventListener('pointercancel', annulerDrag);
+    window.removeEventListener('blur', annulerDrag);
+
+    for (const c of grille.querySelectorAll('.case')) c.classList.remove('cible-ok', 'cible-non');
+    for (const s of racine.querySelectorAll('[data-zone]')) s.classList.remove('survole', 'refuse');
+    // Filet de sécurité : aucun fantôme ne doit survivre.
+    for (const f of document.querySelectorAll('.objet-flottant')) f.remove();
   }
 
-  /* ---------------- taille ---------------- */
+  /* ------------------------------------------------------------------ */
 
   function ajusterTaille() {
-    const largeurDispo = Math.min(racine.clientWidth - 32, 22 * 16);
+    const largeurDispo = Math.min(corps.clientWidth - 8, 20 * 16);
+    if (largeurDispo <= 0) return;
     grille.style.width = `${largeurDispo}px`;
     grille.style.height = `${largeurDispo * (sac().hauteur / sac().largeur)}px`;
     for (const noeud of grille.querySelectorAll('.objet')) {
@@ -430,8 +563,8 @@ export function vueInventaire({ portage, onFermer, onUtiliser, onJeter, utilisab
   }
 
   const observer = new ResizeObserver(ajusterTaille);
-  racine.monter = () => { rendre(); observer.observe(racine); };
-  racine.demonter = () => observer.disconnect();
+  racine.monter = () => { rendre(); observer.observe(corps); };
+  racine.demonter = () => { nettoyer(); observer.disconnect(); };
   racine.rafraichir = rendre;
 
   return racine;
@@ -449,7 +582,7 @@ function decrire(def, instance, position) {
   if (def.ceinture) {
     const p = def.ceinture;
     morceaux.push(
-      `${p.rapides} emplacement${p.rapides > 1 ? 's' : ''} rapide${p.rapides > 1 ? 's' : ''}` +
+      `${p.rapides} rapide${p.rapides > 1 ? 's' : ''}` +
       (p.rapidesPotion ? ` + ${p.rapidesPotion} potions` : '')
     );
   }
@@ -466,12 +599,8 @@ function decrire(def, instance, position) {
   }
 
   const f = def.forme;
-  const taille = f.l === 1 && f.h === 1
-    ? '1 case'
-    : `${f.l * f.h} cases (${f.l}×${f.h})`;
-  morceaux.push(taille);
-
-  if (position.zone === 'sac') morceaux.push('dans le sac : sans effet');
+  morceaux.push(f.l === 1 && f.h === 1 ? '1 case' : `${f.l * f.h} cases (${f.l}×${f.h})`);
+  if (position.zone === 'sac') morceaux.push('dans le sac : passifs inactifs');
 
   return morceaux.join(' · ');
 }

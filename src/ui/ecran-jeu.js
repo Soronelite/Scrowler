@@ -78,7 +78,22 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
       contenu = visuelManquant(piece ? piece.visuel : 'Lieu');
     }
 
-    zoneVisuelle.append(hud, contenu);
+    const statuts = el('div', { class: 'statuts' });
+
+    if (run.piece?.eclairee) {
+      statuts.append(el('span', { class: 'statut lumiere', text: '🔥 Pièce éclairée' }));
+    }
+    for (const label of info.effets) {
+      if (label === 'Torches allumées') continue; // déjà signalé ci-dessus
+      statuts.append(el('span', { class: 'statut', text: label }));
+    }
+    if (run.combat && !run.combat.termine) {
+      for (const e of run.combat.effets) {
+        statuts.append(el('span', { class: 'statut', text: `${combat.ennemi.nom} : ${e.label}` }));
+      }
+    }
+
+    zoneVisuelle.append(hud, el('div', {}, [contenu, statuts.children.length ? statuts : null]));
 
     if (info.effets.length) {
       zoneVisuelle.append(
@@ -131,11 +146,13 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
 
   /* ---------------- actions ---------------- */
 
-  function utilisableMaintenant(def) {
+  function utilisableMaintenant(def, position = null) {
     const a = def.action;
     if (!a) return false;
     if (Run.attendUnChoixDeCompetence(run)) return false;
     const enCombat = run.phase === Run.PHASES.COMBAT;
+    // Fouiller son sac au milieu d'un échange n'a pas de sens.
+    if (position?.zone === 'sac' && enCombat) return false;
     if (a.type === 'attaque' || a.cible === 'ennemi' || a.seulementEnCombat) {
       return enCombat && run.combat.actionsRestantes > 0;
     }
