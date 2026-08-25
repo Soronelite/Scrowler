@@ -19,6 +19,7 @@ import { PARCOURS, LONGUEUR_PARCOURS, ENNEMI_PAR_ID, rencontreAuRang } from '../
 import { xpDUnEnnemi } from '../src/rules/xp.js';
 import * as Effets from '../src/systems/effets.js';
 import * as Inv from '../src/systems/inventaire.js';
+import * as Portage from '../src/systems/portage.js';
 import * as Run from '../src/systems/run.js';
 import { creerPersonnage, actionsDisponibles, armureTotale } from '../src/systems/personnage.js';
 import { objet } from '../src/data/objets.js';
@@ -145,9 +146,9 @@ suite('Objets au sol', ({ test }) => {
   test('un objet qui ne rentre pas reste au sol et n’est pas perdu', () => {
     const p = heros();
     // Saturer la grille : quatre colonnes de quatre cases.
-    p.inventaire.contenu = [];
-    for (let x = 0; x < 4; x++) Inv.placer(p.inventaire, 'epee_deux_mains', x, 0);
-    expect(Inv.casesLibres(p.inventaire)).toBe(0);
+    p.portage.sac.contenu = [];
+    for (let x = 0; x < 4; x++) Inv.placer(p.portage.sac, 'epee_deux_mains', x, 0);
+    expect(Inv.casesLibres(p.portage.sac)).toBe(0);
 
     const run = Run.creerRun(p, { graine: 'sol' });
     Run.executerAction(run, 'attaquer');
@@ -168,14 +169,14 @@ suite('Objets au sol', ({ test }) => {
 
   test('libérer de la place permet de le ramasser', () => {
     const p = heros();
-    p.inventaire.contenu = [];
-    for (let x = 0; x < 4; x++) Inv.placer(p.inventaire, 'epee_deux_mains', x, 0);
+    p.portage.sac.contenu = [];
+    for (let x = 0; x < 4; x++) Inv.placer(p.portage.sac, 'epee_deux_mains', x, 0);
 
     const run = Run.creerRun(p, { graine: 'sol2' });
     run.objetsAuSol.set(run.indexPiece, ['dague']);
 
     expect(Run.ramasserAuSol(run, 'dague')).toBe(false);
-    Run.jeterObjet(run, p.inventaire.contenu[0].uid);
+    Run.jeterObjet(run, p.portage.sac.contenu[0].uid);
     expect(Run.ramasserAuSol(run, 'dague')).toBe(true);
     expect(Run.butinAuSol(run).length).toBe(0);
   });
@@ -195,15 +196,18 @@ suite('Jeter un objet', ({ test }) => {
   test('l’objet est retiré de l’inventaire', () => {
     const p = heros();
     const run = Run.creerRun(p, { graine: 'jet' });
-    const avant = p.inventaire.contenu.length;
-    Run.jeterObjet(run, p.inventaire.contenu[0].uid);
-    expect(p.inventaire.contenu.length).toBe(avant - 1);
+    const avant = p.portage.sac.contenu.length;
+    Inv.ajouter(p.portage.sac, 'dague');
+    const avant2 = p.portage.sac.contenu.length;
+    Run.jeterObjet(run, p.portage.sac.contenu[0].uid);
+    expect(p.portage.sac.contenu.length).toBe(avant2 - 1);
   });
 
   test('jeter un anneau de vigueur ramène les PV sous le nouveau maximum', () => {
     const p = heros();
     const run = Run.creerRun(p, { graine: 'anneau' });
-    const slot = Inv.ajouter(p.inventaire, 'anneau_vigueur');
+    const slot = Inv.ajouter(p.portage.sac, 'anneau_vigueur');
+    Portage.equiper(p.portage, slot.uid, 'bijou1');
     p.pv = 12;
     Run.jeterObjet(run, slot.uid);
     expect(p.pv).toBe(10);
@@ -248,12 +252,12 @@ suite('Parcours', ({ test }) => {
 
 suite('Niveaux d’ennemis', ({ test }) => {
   test('le rat géant est de niveau 1 et rapporte 5 XP', () => {
-    expect(ENNEMI_PAR_ID.rat_geant.niveau).toBe(1);
+    expect(ENNEMI_PAR_ID.rat_geant.rang).toBe(1);
     expect(xpDUnEnnemi(1)).toBe(5);
   });
 
   test('le garde est de niveau 3 et rapporte 12 XP', () => {
-    expect(ENNEMI_PAR_ID.garde.niveau).toBe(3);
+    expect(ENNEMI_PAR_ID.garde.rang).toBe(3);
     expect(xpDUnEnnemi(3)).toBe(12);
   });
 

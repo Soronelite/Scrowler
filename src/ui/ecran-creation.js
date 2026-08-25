@@ -225,7 +225,7 @@ export function ecranCreation({ onLancer, onRetour }) {
         }),
         el('p', {
           class: 'note',
-          text: `${personnageCree.pv} PV · ${personnageCree.inventaire.contenu.length} objets de départ`,
+          text: `${personnageCree.pv} PV · sac ${personnageCree.portage.sac.largeur}×${personnageCree.portage.sac.hauteur}`,
         }),
         etatSauvegarde,
       ])

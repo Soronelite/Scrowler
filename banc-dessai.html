@@ -641,6 +641,9 @@ async function runTests() {
     await import('./tests/core.test.js');
     await import('./tests/systemes.test.js');
     await import('./tests/xp.test.js');
+    await import('./tests/regles.test.js');
+    await import('./tests/equipement.test.js');
+    await import('./tests/xp.test.js');
     const { runAll } = await import('./tests/harness.js');
     const r = runAll();
     out.innerHTML = r.results.map((s) => `

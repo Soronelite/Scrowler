@@ -14,8 +14,12 @@ export const NIVEAU_MAX = 10;
  */
 export const SEUILS = [null, 0, 10, 24, 43, 69, 104, 151, 214, 299, 414];
 
-/** XP gagnée en tuant un ennemi, selon son niveau. */
-export const XP_PAR_NIVEAU_ENNEMI = {
+/**
+ * XP rapportée par un ennemi, indexée sur son rang.
+ * Les entrées 11 et 12 servent aux variantes 2 et 3 d'un rang 10, en
+ * prolongeant la même progression.
+ */
+export const XP_PAR_RANG_ENNEMI = {
   1: 5,
   2: 8,
   3: 12,
@@ -26,6 +30,8 @@ export const XP_PAR_NIVEAU_ENNEMI = {
   8: 65,
   9: 90,
   10: 125,
+  11: 172,
+  12: 237,
 };
 
 /** XP gagnée en passant à une nouvelle pièce. */
@@ -49,8 +55,18 @@ export function xpRequisePourNiveauSuivant(niveau) {
   return SEUILS[niveau + 1] - SEUILS[niveau];
 }
 
-/** XP gagnée pour un ennemi de ce niveau. */
-export function xpDUnEnnemi(niveau) {
-  if (niveau === null || niveau === undefined) return 0;
-  return XP_PAR_NIVEAU_ENNEMI[niveau] ?? 0;
+export const RANG_MAX = 10;
+export const VARIANTE_MAX = 3;
+
+/**
+ * XP rapportée par un ennemi.
+ *
+ * Une variante supérieure vaut le rang au-dessus : plutôt qu'une seconde
+ * courbe à entretenir, on décale la lecture dans la table existante.
+ * Rat rang 1 : variante 1 → 5, variante 2 → 8, variante 3 → 12.
+ */
+export function xpDUnEnnemi(rang, variante = 1) {
+  if (rang === null || rang === undefined) return 0;
+  const index = rang + Math.max(1, variante) - 1;
+  return XP_PAR_RANG_ENNEMI[index] ?? 0;
 }

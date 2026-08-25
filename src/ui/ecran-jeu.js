@@ -282,7 +282,7 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
   function ouvrirInventaire() {
     if (inventaireOuvert) return;
     inventaireOuvert = vueInventaire({
-      inventaire: personnage.inventaire,
+      portage: personnage.portage,
       utilisableMaintenant,
       onUtiliser: (uid) => {
         Run.utiliserObjet(run, uid);

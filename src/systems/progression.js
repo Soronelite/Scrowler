@@ -53,9 +53,9 @@ export function gagnerXp(prog, montant) {
   return resultat;
 }
 
-/** XP gagnée pour un ennemi vaincu, d'après son niveau. */
-export function xpPourEnnemi(niveau) {
-  return xpDUnEnnemi(niveau);
+/** XP gagnée pour un ennemi vaincu, d'après son rang et sa variante. */
+export function xpPourEnnemi(rang, variante = 1) {
+  return xpDUnEnnemi(rang, variante);
 }
 
 /**

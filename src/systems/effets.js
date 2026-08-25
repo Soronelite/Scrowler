@@ -13,6 +13,7 @@
 
 import { ModifierPipeline, PHASES } from '../core/modifiers.js';
 import { objet } from '../data/objets.js';
+import * as Portage from './portage.js';
 import { PROVISOIRE } from '../rules/provisoire.js';
 
 export function creerListeEffets() {
@@ -89,13 +90,9 @@ export const lootAmeliore = (liste) => liste.some((e) => e.bonusLoot);
 /* Passifs d'objets                                                    */
 /* ------------------------------------------------------------------ */
 
-/** Somme d'un passif sur tout l'inventaire. */
-export function passifCumule(inventaire, champ) {
-  if (!PROVISOIRE.objets.passifsActifsDansLInventaire) return 0;
-  return inventaire.contenu.reduce(
-    (total, slot) => total + (objet(slot.objetId).passif?.[champ] ?? 0),
-    0
-  );
+/** Somme d'un passif sur les objets ÉQUIPÉS. Le sac n'agit pas. */
+export function passifCumule(portage, champ) {
+  return Portage.passif(portage, champ);
 }
 
 /* ------------------------------------------------------------------ */
@@ -110,10 +107,10 @@ export function passifCumule(inventaire, champ) {
  * Les modificateurs du joueur portent le tag « joueur », ce qui les empêche
  * de s'appliquer aux attaques ennemies.
  */
-export function construirePipeline(inventaire, effets) {
+export function construirePipeline(portage, effets) {
   const pipeline = new ModifierPipeline();
 
-  const bonusJet = passifCumule(inventaire, 'bonusJet');
+  const bonusJet = passifCumule(portage, 'bonusJet');
   if (bonusJet !== 0) {
     pipeline.add({
       id: 'passif-bonus-jet',

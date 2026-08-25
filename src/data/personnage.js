@@ -43,7 +43,18 @@ export const CLASSES = [
     nom: 'Chevalier',
     icone: '🛡️',
     description: 'Seule classe disponible pour ce test.',
-    objetsDeDepart: ['epee_deux_mains', 'pain_rassis'],
+    /**
+     * L'ordre compte : le sac à dos en premier, sinon la grille reste en 2×2
+     * et le reste de la tenue ne rentre pas.
+     */
+    equipementDeDepart: [
+      { objetId: 'sac_a_dos', emplacement: 'dos' },
+      { objetId: 'ceinture_corde', emplacement: 'ceinture' },
+      { objetId: 'epee_courte', emplacement: 'mainDroite' },
+      { objetId: 'bouclier_bois', emplacement: 'mainGauche' },
+      { objetId: 'pain_rassis', rapide: 0 },
+    ],
+    objetsDeDepart: [],
   },
 ];
 

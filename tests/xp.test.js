@@ -9,9 +9,10 @@ import { creerProgression, gagnerXp, avancement, xpPourEnnemi } from '../src/sys
 import { actionsParTour, statsParDefaut, STAT_MAX } from '../src/rules/stats.js';
 import { creerPersonnage, actionsDisponibles, armureTotale, pvMaxTotal } from '../src/systems/personnage.js';
 import * as Inv from '../src/systems/inventaire.js';
+import * as Portage from '../src/systems/portage.js';
 import * as Effets from '../src/systems/effets.js';
 import * as Run from '../src/systems/run.js';
-import { niveauDe, ENNEMI_PAR_ID } from '../src/data/monde.js';
+import { rangDe, varianteDe, ENNEMI_PAR_ID } from '../src/data/monde.js';
 import { ciblesDisponibles, toutesLesCibles } from '../src/systems/competences.js';
 import { roll } from '../src/core/dice.js';
 
@@ -109,13 +110,24 @@ suite('Points de compétence', ({ test }) => {
 /* ------------------------------------------------------------------ */
 
 suite('XP des ennemis', ({ test }) => {
-  test('la table suit le document', () => {
-    expect([1, 2, 3, 4, 5].map(xpDUnEnnemi)).toEqual([5, 8, 12, 17, 24]);
+  test('une variante supérieure vaut le rang au-dessus', () => {
+    expect(xpDUnEnnemi(1, 1)).toBe(5);
+    expect(xpDUnEnnemi(1, 2)).toBe(8);
+    expect(xpDUnEnnemi(1, 3)).toBe(12);
+    expect(xpDUnEnnemi(3, 3)).toBe(24);
   });
 
-  test('le garde est au niveau 3 et vaut 12 XP', () => {
-    expect(niveauDe(ENNEMI_PAR_ID.garde)).toBe(3);
-    expect(xpPourEnnemi(niveauDe(ENNEMI_PAR_ID.garde))).toBe(12);
+  test('un rang 10 en variante 3 reste défini', () => {
+    expect(xpDUnEnnemi(10, 3)).toBe(237);
+  });
+
+  test('la table suit le document', () => {
+    expect([1, 2, 3, 4, 5].map((rang) => xpDUnEnnemi(rang))).toEqual([5, 8, 12, 17, 24]);
+  });
+
+  test('le garde est au rang 3 et vaut 12 XP', () => {
+    expect(rangDe(ENNEMI_PAR_ID.garde)).toBe(3);
+    expect(xpPourEnnemi(rangDe(ENNEMI_PAR_ID.garde))).toBe(12);
   });
 
   test('un ennemi sans niveau ne donne aucune XP', () => {
@@ -160,11 +172,12 @@ suite('Effets temporaires', ({ test }) => {
     const p = perso();
     const effets = Effets.creerListeEffets();
     Effets.appliquer(effets, { id: 'blocage', label: 'Blocage', armure: 4, dureeTours: 'prochainTour' });
-    expect(armureTotale(p, effets)).toBe(4);
+    const base = armureTotale(p);
+    expect(armureTotale(p, effets)).toBe(base + 4);
     Effets.finDeTour(effets);
-    expect(armureTotale(p, effets)).toBe(4);
+    expect(armureTotale(p, effets)).toBe(base + 4);
     Effets.finDeTour(effets);
-    expect(armureTotale(p, effets)).toBe(0);
+    expect(armureTotale(p, effets)).toBe(base);
   });
 
   test('un effet en pièces survit aux tours et expire au changement de pièce', () => {
@@ -177,35 +190,43 @@ suite('Effets temporaires', ({ test }) => {
   });
 
   test('la potion de force ajoute 2 dégâts aux jets du joueur', () => {
-    const inv = Inv.creerInventaire();
+    const portage = Portage.creerPortage();
     const effets = Effets.creerListeEffets();
     Effets.appliquer(effets, { id: 'force', label: 'Force', degats: 2, dureeTours: 'prochainTour' });
-    const pipeline = Effets.construirePipeline(inv, effets);
+    const pipeline = Effets.construirePipeline(portage, effets);
     const jet = roll('2d6', { rng: createScriptedRng([3, 3]), pipeline, tags: ['degats', 'joueur'] });
     expect(jet.total).toBe(8);
   });
 
   test('la potion de force n’aide pas l’ennemi', () => {
-    const inv = Inv.creerInventaire();
+    const portage = Portage.creerPortage();
     const effets = Effets.creerListeEffets();
     Effets.appliquer(effets, { id: 'force', label: 'Force', degats: 2, dureeTours: 'prochainTour' });
-    const pipeline = Effets.construirePipeline(inv, effets);
+    const pipeline = Effets.construirePipeline(portage, effets);
     const jet = roll('2d6', { rng: createScriptedRng([3, 3]), pipeline, tags: ['degats', 'ennemi'] });
     expect(jet.total).toBe(6);
   });
 
   test('l’amulette de chance ajoute 1 à tous les jets du joueur', () => {
-    const inv = Inv.creerInventaire();
-    Inv.ajouter(inv, 'amulette_chance');
-    const pipeline = Effets.construirePipeline(inv, []);
+    const portage = Portage.creerPortage();
+    Portage.equiper(portage, Inv.ajouter(portage.sac, 'amulette_chance').uid, 'bijou1');
+    const pipeline = Effets.construirePipeline(portage, []);
     const jet = roll('2d6', { rng: createScriptedRng([3, 3]), pipeline, tags: ['degats', 'joueur'] });
     expect(jet.total).toBe(7);
+  });
+
+  test('une amulette restée dans le sac ne change rien', () => {
+    const portage = Portage.creerPortage();
+    Inv.ajouter(portage.sac, 'amulette_chance');
+    const pipeline = Effets.construirePipeline(portage, []);
+    const jet = roll('2d6', { rng: createScriptedRng([3, 3]), pipeline, tags: ['degats', 'joueur'] });
+    expect(jet.total).toBe(6);
   });
 
   test('l’anneau de vigueur augmente les PV maximum', () => {
     const p = perso();
     expect(pvMaxTotal(p)).toBe(10);
-    Inv.ajouter(p.inventaire, 'anneau_vigueur');
+    Portage.equiper(p.portage, Inv.ajouter(p.portage.sac, 'anneau_vigueur').uid, 'bijou1');
     expect(pvMaxTotal(p)).toBe(12);
   });
 });
@@ -214,29 +235,29 @@ suite('Effets temporaires', ({ test }) => {
 
 suite('Nouveaux objets', ({ test }) => {
   test('le bouclier en bois occupe un carré de 2 sur 2', () => {
-    const inv = Inv.creerInventaire();
+    const inv = Inv.creerInventaire(4, 4);
     Inv.placer(inv, 'bouclier_bois', 0, 0);
     expect(Inv.casesLibres(inv)).toBe(12);
   });
 
   test('un carré n’est pas pivotable', () => {
-    const inv = Inv.creerInventaire();
+    const inv = Inv.creerInventaire(4, 4);
     const slot = Inv.placer(inv, 'armure_mailles', 0, 0);
     expect(Inv.pivoter(inv, slot.uid)).toBe(false);
   });
 
   test('deux carrés de 2 sur 2 tiennent côte à côte', () => {
-    const inv = Inv.creerInventaire();
+    const inv = Inv.creerInventaire(4, 4);
     expect(Inv.ajouter(inv, 'bouclier_bois') !== null).toBe(true);
     expect(Inv.ajouter(inv, 'armure_mailles') !== null).toBe(true);
     expect(Inv.casesLibres(inv)).toBe(8);
   });
 
-  test('les armures cumulent leur passif', () => {
-    const inv = Inv.creerInventaire();
-    Inv.ajouter(inv, 'armure_mailles');
-    Inv.ajouter(inv, 'casque_fer');
-    expect(Inv.armureDesObjets(inv)).toBe(4);
+  test('les armures équipées cumulent leur passif', () => {
+    const portage = Portage.creerPortage();
+    Portage.equiper(portage, Inv.ajouter(portage.sac, 'casque_fer').uid, 'tete');
+    Portage.equiper(portage, Inv.ajouter(portage.sac, 'cape_protection').uid, 'cape');
+    expect(Portage.passif(portage, 'armure')).toBe(2);
   });
 });
 

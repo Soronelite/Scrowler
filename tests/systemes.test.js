@@ -9,36 +9,49 @@
 import { suite, expect } from './harness.js';
 import { createRng, createScriptedRng } from '../src/core/rng.js';
 import * as Inv from '../src/systems/inventaire.js';
+import * as Portage from '../src/systems/portage.js';
 import { degatsApresArmure, creerCombat, frapperEnnemi, tenterFuite } from '../src/systems/combat.js';
 import { creerPersonnage, armureTotale, soigner, blesser } from '../src/systems/personnage.js';
 import { tirer, raretesAutorisees, candidats } from '../src/systems/loot.js';
 import { statsParDefaut, pvMax, armureDeBase, pointsRestants } from '../src/rules/stats.js';
 import { estPivotable, objet } from '../src/data/objets.js';
 
+const heros = (stats = {}) =>
+  creerPersonnage({
+    nom: 'Test', race: 'humain', sexe: 'homme', classe: 'chevalier',
+    stats: { ...statsParDefaut(), ...stats },
+  });
+
 /* ------------------------------------------------------------------ */
 
 suite('Inventaire', ({ test }) => {
-  test('la grille fait 4 sur 4', () => {
+  test('sans sac à dos la grille fait 2 sur 2', () => {
     const inv = Inv.creerInventaire();
+    expect(inv.largeur).toBe(2);
+    expect(Inv.casesLibres(inv)).toBe(4);
+  });
+
+  test('avec un sac à dos la grille fait 4 sur 4', () => {
+    const inv = Inv.creerInventaire(4, 4);
     expect(inv.largeur).toBe(4);
     expect(Inv.casesLibres(inv)).toBe(16);
   });
 
   test('une épée à deux mains occupe une colonne entière', () => {
-    const inv = Inv.creerInventaire();
+    const inv = Inv.creerInventaire(4, 4);
     Inv.placer(inv, 'epee_deux_mains', 0, 0);
     expect(Inv.casesLibres(inv)).toBe(12);
   });
 
   test('deux objets ne peuvent pas se superposer', () => {
-    const inv = Inv.creerInventaire();
+    const inv = Inv.creerInventaire(4, 4);
     Inv.placer(inv, 'epee_deux_mains', 0, 0);
     expect(Inv.peutPlacer(inv, 'dague', 0, 2, false)).toBe(false);
     expect(Inv.peutPlacer(inv, 'dague', 1, 2, false)).toBe(true);
   });
 
   test('un objet ne peut pas dépasser de la grille', () => {
-    const inv = Inv.creerInventaire();
+    const inv = Inv.creerInventaire(4, 4);
     expect(Inv.peutPlacer(inv, 'epee_deux_mains', 0, 1, false)).toBe(false);
   });
 
@@ -48,45 +61,52 @@ suite('Inventaire', ({ test }) => {
   });
 
   test('la rotation transforme une colonne en ligne', () => {
-    const inv = Inv.creerInventaire();
+    const inv = Inv.creerInventaire(4, 4);
     const slot = Inv.placer(inv, 'epee_courte', 0, 0);
     Inv.pivoter(inv, slot.uid);
     expect(Inv.forme(slot.objetId, slot.pivote)).toEqual({ l: 2, h: 1 });
   });
 
   test('la rotation est refusée si la place manque', () => {
-    const inv = Inv.creerInventaire();
+    const inv = Inv.creerInventaire(4, 4);
     const epee = Inv.placer(inv, 'epee_deux_mains', 0, 0);
     Inv.placer(inv, 'dague', 1, 0);
     expect(Inv.pivoter(inv, epee.uid)).toBe(false);
   });
 
   test('l’ajout automatique trouve une place, puis échoue quand c’est plein', () => {
-    const inv = Inv.creerInventaire();
+    const inv = Inv.creerInventaire(4, 4);
     for (let i = 0; i < 4; i++) expect(Inv.ajouter(inv, 'epee_deux_mains') !== null).toBe(true);
     expect(Inv.ajouter(inv, 'dague')).toBe(null);
   });
 
   test('un déplacement sur une case occupée est refusé', () => {
-    const inv = Inv.creerInventaire();
+    const inv = Inv.creerInventaire(4, 4);
     const a = Inv.placer(inv, 'dague', 0, 0);
     Inv.placer(inv, 'dague', 1, 0);
     expect(Inv.deplacer(inv, a.uid, 1, 0, false)).toBe(false);
     expect(Inv.deplacer(inv, a.uid, 2, 0, false)).toBe(true);
   });
 
-  test('les armures cumulent leur passif', () => {
-    const inv = Inv.creerInventaire();
-    Inv.ajouter(inv, 'bouclier_bois');
-    Inv.ajouter(inv, 'casque_fer');
-    expect(Inv.armureDesObjets(inv)).toBe(3);
+  test('les armures équipées cumulent leur passif', () => {
+    const p = heros();
+    Portage.equiper(p.portage, Inv.ajouter(p.portage.sac, 'casque_fer').uid, 'tete');
+    // Bouclier en bois déjà en main gauche : +2, plus le casque : +1.
+    expect(Portage.passif(p.portage, 'armure')).toBe(3);
   });
 
-  test('les armes sont repérables', () => {
-    const inv = Inv.creerInventaire();
-    Inv.ajouter(inv, 'epee_courte');
-    Inv.ajouter(inv, 'pain_rassis');
-    expect(Inv.armes(inv).length).toBe(1);
+  test('un objet resté dans le sac n’apporte aucun passif', () => {
+    const p = heros();
+    const avant = Portage.passif(p.portage, 'armure');
+    Inv.ajouter(p.portage.sac, 'casque_fer');
+    expect(Portage.passif(p.portage, 'armure')).toBe(avant);
+  });
+
+  test('seules les armes en main comptent', () => {
+    const p = heros();
+    expect(Portage.armesEquipees(p.portage).length).toBe(1);
+    Inv.ajouter(p.portage.sac, 'dague');
+    expect(Portage.armesEquipees(p.portage).length).toBe(1);
   });
 });
 
@@ -114,22 +134,26 @@ suite('Personnage', ({ test }) => {
     expect(pointsRestants({ ...statsParDefaut(), sante: 4 })).toBe(0);
   });
 
-  test('le chevalier démarre avec ses deux objets', () => {
+  test('le chevalier démarre équipé', () => {
     const p = creerPersonnage({
       nom: 'Test', race: 'humain', sexe: 'homme', classe: 'chevalier',
       stats: statsParDefaut(),
     });
-    expect(p.inventaire.contenu.length).toBe(2);
+    expect(p.portage.equipement.mainDroite.objetId).toBe('epee_courte');
+    expect(p.portage.equipement.mainGauche.objetId).toBe('bouclier_bois');
+    expect(p.portage.equipement.dos.objetId).toBe('sac_a_dos');
+    expect(p.portage.raccourcis[0].contenu.objetId).toBe('pain_rassis');
     expect(p.pv).toBe(10);
   });
 
-  test('l’armure des objets s’ajoute à celle des statistiques', () => {
+  test('l’armure des objets équipés s’ajoute à celle des statistiques', () => {
     const p = creerPersonnage({
       nom: 'Test', race: 'humain', sexe: 'homme', classe: 'chevalier',
       stats: { ...statsParDefaut(), defense: 4 },
     });
-    Inv.ajouter(p.inventaire, 'casque_fer');
-    expect(armureTotale(p)).toBe(3);
+    Portage.equiper(p.portage, Inv.ajouter(p.portage.sac, 'casque_fer').uid, 'tete');
+    // 2 de Défense au-dessus du minimum, +2 bouclier, +1 casque.
+    expect(armureTotale(p)).toBe(2 + 2 + 1);
   });
 
   test('les soins ne dépassent pas le maximum', () => {

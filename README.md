@@ -41,12 +41,15 @@ src/rules/              règles chiffrées
 
 src/data/               contenu, modifiable sans toucher au moteur
   personnage.js         raretés, races, sexes, classes
-  objets.js             les 17 objets
-  monde.js              ennemis (avec leur niveau), tables de loot, 3 rencontres
+  emplacements.js       les 10 emplacements d'équipement
+  objets.js             les 24 objets
+  monde.js              ennemis (rang, variante), tables de loot, parcours
 
 src/systems/            systèmes de jeu
   personnage.js         création, PV, armure, actions par tour
-  inventaire.js         grille 4×4, formes, rotation
+  equipement.js         emplacements, mains, ceinture, usure et réparation
+  portage.js            orchestre sac, équipement et emplacements rapides
+  inventaire.js         grille 2×2 ou 4×4, formes, rotation
   combat.js             tour par tour, armure, fuite
   effets.js             effets temporaires et passifs, pipeline de jets
   progression.js        XP, niveaux, points de compétence
@@ -104,9 +107,35 @@ toucher à l'écran de montée de niveau.
 
 ## Tests
 
-113 tests, sans dépendance externe. Bouton « Lancer les tests » dans
+187 tests, sans dépendance externe. Bouton « Lancer les tests » dans
 `banc-dessai.html`, ou en ligne de commande avec un `package.json` contenant
 `{"type":"module"}`.
+
+## Vocabulaire
+
+Quatre notions distinctes, à ne jamais confondre :
+
+| Terme | Plage | Désigne |
+|---|---|---|
+| niveau | 1–10 | le personnage joueur |
+| étage | 1–5 | un palier de donjon (à venir) |
+| rang | 1–10 | l'archétype d'un ennemi, il donne l'XP |
+| variante | 1–3 | la déclinaison d'un même ennemi |
+
+L'XP d'un ennemi se lit `table[rang + variante − 1]` : une variante supérieure
+vaut le rang au-dessus, sans seconde courbe à entretenir.
+
+## Portage
+
+Trois contenants séparés, orchestrés par `portage.js` :
+
+- **équipement** — tête, armure, deux mains, ceinture, dos, cape, trois bijoux ;
+- **emplacements rapides** — ouverts par la ceinture portée, objets 1×1 ;
+- **sac** — 2×2 sans sac à dos, 4×4 avec.
+
+Règle structurante : **seul ce qui est équipé ou en emplacement rapide agit**.
+Le sac ne sert qu'au transport, ses objets n'apportent aucun passif et ne sont
+pas utilisables.
 
 ## État des décisions
 

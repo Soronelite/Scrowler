@@ -13,12 +13,15 @@ import {
   armureTotale,
   actionsDisponibles,
   pvMaxTotal,
+  recaler,
   soigner,
   blesser,
   estMort,
   apresGainDeStatistique,
 } from './personnage.js';
 import * as Inv from './inventaire.js';
+import * as Portage from './portage.js';
+import * as Eq from './equipement.js';
 import * as Combat from './combat.js';
 import * as Effets from './effets.js';
 import * as Prog from './progression.js';
@@ -74,7 +77,7 @@ export function progression(run) {
 const cleAction = (run, id) => `${run.indexPiece}:${id}`;
 
 /** Pipeline reconstruit à chaque jet, à partir de l'inventaire et des effets. */
-const pipelineDe = (run) => Effets.construirePipeline(run.personnage.inventaire, run.effets);
+const pipelineDe = (run) => Effets.construirePipeline(run.personnage.portage, run.effets);
 
 /* ------------------------------------------------------------------ */
 /* Expérience                                                          */
@@ -245,7 +248,7 @@ function poserAuSol(run, objetDef) {
 /** Tente de ranger un objet. Sinon il reste au sol, récupérable plus tard. */
 function recupererOuLaisser(run, objetDef) {
   const rarete = RARETE_PAR_ID[objetDef.rarete].nom;
-  const slot = Inv.ajouter(run.personnage.inventaire, objetDef.id);
+  const slot = Inv.ajouter(run.personnage.portage.sac, objetDef.id);
 
   if (slot) {
     noter(run, `Tu trouves : ${objetDef.nom} (${rarete}).`, 'butin');
@@ -286,7 +289,7 @@ export function ramasserAuSol(run, objetId) {
   if (index === -1) return false;
 
   const objetDef = objet(objetId);
-  const slot = Inv.ajouter(run.personnage.inventaire, objetId);
+  const slot = Inv.ajouter(run.personnage.portage.sac, objetId);
   if (!slot) {
     noter(run, `${objetDef.nom} ne rentre toujours pas.`, 'alerte');
     prevenir(run);
@@ -305,16 +308,66 @@ export function butinAuSol(run) {
   return objetsAuSol(run).map((id) => objet(id));
 }
 
-/** Jette un objet de l'inventaire. L'objet est détruit. */
+/** Jette un objet, où qu'il soit porté. L'objet est détruit. */
 export function jeterObjet(run, uid) {
-  const slot = Inv.trouver(run.personnage.inventaire, uid);
-  if (!slot) return false;
-  const objetDef = objet(slot.objetId);
-  Inv.retirer(run.personnage.inventaire, uid);
-  run.personnage.pv = Math.min(run.personnage.pv, pvMaxTotal(run.personnage));
+  const portage = run.personnage.portage;
+  const position = Portage.localiser(portage, uid);
+  if (!position) return false;
+
+  const instance = position.instance ?? position.slot;
+  const objetDef = objet(instance.objetId);
+
+  Portage.extraire(portage, uid);
+  for (const reste of Portage.resynchroniser(portage)) {
+    noter(run, `${objet(reste.objetId).nom} ne rentre plus et tombe au sol.`, 'alerte');
+    poserAuSol(run, objet(reste.objetId));
+  }
+  recaler(run.personnage);
+
   noter(run, `${objetDef.nom} est jeté.`, 'alerte');
   prevenir(run);
   return true;
+}
+
+/* ------------------------------------------------------------------ */
+/* Usure                                                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Consomme une utilisation après un usage.
+ * Un consommable disparaît à zéro ; une arme se brise et reste dans l'état
+ * « brisée », ses passifs conservés (voir provisoire.js).
+ */
+function appliquerUsure(run, instance, def) {
+  if (!def.usure) return;
+
+  const etat = Eq.user(instance);
+  if (etat.detruit) {
+    Portage.extraire(run.personnage.portage, instance.uid);
+    Portage.resynchroniser(run.personnage.portage);
+    recaler(run.personnage);
+    return;
+  }
+  if (etat.brise) {
+    noter(run, `${def.nom} se brise.`, 'alerte');
+    recaler(run.personnage);
+    return;
+  }
+
+  const restant = instance.utilisations;
+  if (def.usure.max > 1 && restant <= 5) {
+    noter(run, `${def.nom} est très usé (${restant} utilisation${restant > 1 ? 's' : ''}).`, 'alerte');
+  }
+}
+
+/** Recharge les armes qui se nourrissent des victoires. */
+function rechargerSurVictoire(run) {
+  for (const instance of Portage.toutesLesInstances(run.personnage.portage)) {
+    const gain = Eq.rechargerSurVictoire(instance);
+    if (gain > 0) {
+      noter(run, `${objet(instance.objetId).nom} se recharge (+${gain}).`, 'effet');
+    }
+  }
 }
 
 function avancer(run) {
@@ -383,11 +436,12 @@ function consommerAction(run, cout) {
 export function objetsUtilisables(run) {
   const enCombat = run.phase === PHASES.COMBAT;
 
-  return run.personnage.inventaire.contenu
-    .map((slot) => ({ slot, def: objet(slot.objetId) }))
+  // Seuls les objets équipés ou en emplacement rapide sont utilisables :
+  // le contenu du sac n'agit pas.
+  return Portage.actionsDisponibles(run.personnage.portage)
+    .map((porte) => ({ slot: porte.instance, def: objet(porte.instance.objetId), zone: porte.zone }))
     .filter(({ def }) => {
       const a = def.action;
-      if (!a) return false;
       if (a.type === 'attaque' || a.cible === 'ennemi' || a.seulementEnCombat) return enCombat;
       return run.phase !== PHASES.FIN;
     });
@@ -395,16 +449,20 @@ export function objetsUtilisables(run) {
 
 export function attaqueDeRepli(run) {
   if (run.phase !== PHASES.COMBAT) return null;
-  if (Inv.armes(run.personnage.inventaire).length > 0) return null;
+  if (Portage.armesEquipees(run.personnage.portage).length > 0) return null;
   return PROVISOIRE.combat.attaqueSansArme;
 }
 
 export function utiliserObjet(run, uid) {
   if (attendUnChoixDeCompetence(run)) return;
 
-  const slot = Inv.trouver(run.personnage.inventaire, uid);
-  if (!slot) return;
-  const def = objet(slot.objetId);
+  const position = Portage.localiser(run.personnage.portage, uid);
+  if (!position) return;
+  const instance = position.instance ?? position.slot;
+  if (position.zone === 'sac') return; // le sac ne sert qu'au transport
+  if (instance.brise) return;
+
+  const def = objet(instance.objetId);
   const action = def.action;
   if (!action) return;
 
@@ -440,10 +498,7 @@ export function utiliserObjet(run, uid) {
       noter(run, `Effet non implémenté : ${action.type}`, 'alerte');
   }
 
-  if (action.consomme && PROVISOIRE.objets.consommablesDetruitsApresUsage) {
-    Inv.retirer(run.personnage.inventaire, uid);
-    run.personnage.pv = Math.min(run.personnage.pv, pvMaxTotal(run.personnage));
-  }
+  appliquerUsure(run, instance, def);
 
   if (run.phase === PHASES.COMBAT) consommerAction(run, action.cout ?? 1);
   prevenir(run);
@@ -476,13 +531,18 @@ function frapper(run, source, des) {
     noter(run, `${run.combat.ennemi.nom} est vaincu.`, 'victoire');
     run.phase = PHASES.APRES_COMBAT;
 
-    const niveau = run.combat.ennemi.niveau;
-    if (niveau === null || niveau === undefined) {
-      noter(run, 'Aucun niveau défini pour cet ennemi : pas d’XP.', 'alerte');
+    const { rang, variante } = run.combat.ennemi;
+    if (rang === null || rang === undefined) {
+      noter(run, 'Aucun rang défini pour cet ennemi : pas d’XP.', 'alerte');
     } else {
-      donnerXp(run, Prog.xpPourEnnemi(niveau), `${run.combat.ennemi.nom} niveau ${niveau}`);
+      const etiquette =
+        variante > 1
+          ? `${run.combat.ennemi.nom} rang ${rang} variante ${variante}`
+          : `${run.combat.ennemi.nom} rang ${rang}`;
+      donnerXp(run, Prog.xpPourEnnemi(rang, variante), etiquette);
     }
 
+    rechargerSurVictoire(run);
     Effets.finDeCombat(run.effets);
   }
 }

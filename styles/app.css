@@ -30,7 +30,18 @@ html, body {
   overscroll-behavior: none;
 }
 
-#app { min-height: 100dvh; display: flex; flex-direction: column; }
+/*
+ * Chaîne de hauteurs : #app est figé à la hauteur du viewport et ne défile
+ * jamais. Ce sont les zones internes qui défilent. Sans `height` ferme ici,
+ * `flex: 1` sur .ecran donne un flex-basis de 0 et la hauteur retombe sur le
+ * contenu : chaque ligne de journal ajoutée agrandit alors la page.
+ */
+#app {
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
 
 h1, h2, h3 { font-family: var(--display); font-weight: 400; margin: 0; }
 
@@ -59,11 +70,12 @@ button.discret { background: none; border-color: var(--ink-700); }
 
 :focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
 
-.ecran { flex: 1; display: flex; flex-direction: column; }
+.ecran { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
 
 /* ---------------- accueil ---------------- */
 
 .accueil {
+  overflow-y: auto;
   justify-content: center;
   align-items: center;
   text-align: center;
@@ -85,7 +97,16 @@ button.discret { background: none; border-color: var(--ink-700); }
 
 /* ---------------- pages avec en-tête ---------------- */
 
-.page { padding: 1.2rem clamp(1rem, 4vw, 2rem) 6.5rem; max-width: 46rem; margin: 0 auto; width: 100%; }
+.page {
+  padding: 1.2rem clamp(1rem, 4vw, 2rem) 6.5rem;
+  max-width: 46rem;
+  margin: 0 auto;
+  width: 100%;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
 .page-titre { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
 .page-titre h2 { font-size: clamp(1.5rem, 5vw, 2rem); }
 .etiquette {
@@ -196,12 +217,15 @@ input[type="text"] {
 
 .jeu {
   display: grid;
-  grid-template-rows: 2fr 1fr 1fr;
-  height: 100dvh;
+  /* minmax(0, …) est indispensable : `1fr` seul vaut `minmax(auto, 1fr)`
+     et la piste refuserait de descendre sous la hauteur de son contenu. */
+  grid-template-rows: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
 }
 
-.zone { min-height: 0; position: relative; }
+.zone { min-height: 0; min-width: 0; position: relative; overflow: hidden; }
 
 .zone-visuelle {
   border-bottom: 1px solid var(--ink-700);
@@ -254,6 +278,7 @@ input[type="text"] {
 
 .zone-texte {
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 0.9rem clamp(0.8rem, 3vw, 1.4rem);
   border-bottom: 1px solid var(--ink-700);
   -webkit-overflow-scrolling: touch;
@@ -485,3 +510,62 @@ button.danger:hover:not(:disabled) {
   border-color: var(--loss);
   color: var(--ink-900);
 }
+
+/* ---------------- équipement ---------------- */
+
+.sous-titre-inv {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--bone-dim);
+  margin: 0.3rem 0 -0.4rem;
+}
+
+.equipement {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.2rem, 1fr));
+  gap: 0.4rem;
+}
+
+.slot, .rapide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.5rem 0.3rem;
+  min-height: 4.6rem;
+  background: var(--ink-850);
+  border: 1px solid var(--ink-700);
+  border-radius: 3px;
+  text-align: center;
+}
+.slot.rempli, .rapide.rempli { background: var(--ink-800); border-color: var(--ink-600); }
+.slot.selectionne, .rapide.selectionne { border-color: var(--brass); box-shadow: 0 0 0 1px var(--brass-deep); }
+.slot.grise { opacity: 0.3; }
+
+.slot-nom {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bone-dim);
+}
+.slot-icone { font-size: 1.5rem; line-height: 1.1; }
+.slot-objet { font-size: 0.62rem; line-height: 1.15; color: var(--bone-dim); }
+.slot.rempli .slot-objet { color: var(--bone); }
+
+.brise {
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  color: var(--loss);
+}
+.objet.brise-fond { border-color: var(--loss); opacity: 0.6; }
+
+.ceinture-rapide {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(5.2rem, 1fr));
+  gap: 0.4rem;
+}
+.rapide.potion { border-style: dashed; }

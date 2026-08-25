@@ -51,8 +51,10 @@ export const PROVISOIRE = {
   },
 
   objets: {
-    passifsActifsDansLInventaire: true,
-    consommablesDetruitsApresUsage: true,
+    /** Décidé : seuls les objets équipés ou en emplacement rapide agissent. */
+    passifsActifsDansLInventaire: false,
+    /** Un objet brisé garde-t-il ses passifs ? */
+    passifsConservesSiBrise: true,
   },
 
   personnage: {
@@ -122,11 +124,6 @@ export const QUESTIONS_OUVERTES = [
     provisoire: 'Fréquent 60, Commun 25, Peu commun 10, Rare 4, Légendaire 1.',
   },
   {
-    sujet: 'Passifs',
-    question: "Un bouclier agit-il depuis l'inventaire, ou faudra-t-il un système d'équipement ?",
-    provisoire: "Depuis l'inventaire.",
-  },
-  {
     sujet: 'Races',
     question: "Aucune liste de races ni aucun effet n'est défini.",
     provisoire: 'Humain, Elfe, Nain, Orc — cosmétiques.',
@@ -140,5 +137,35 @@ export const QUESTIONS_OUVERTES = [
     sujet: 'Arme utilisée',
     question: "Que se passe-t-il si le joueur n'a plus aucune arme ?",
     provisoire: 'Attaque de repli à 1d2.',
+  },
+  {
+    sujet: 'Objet brisé',
+    question:
+      "Une arme brisée garde-t-elle ses passifs, ou devient-elle totalement inerte ?",
+    provisoire: 'Elle garde ses passifs mais ne peut plus être utilisée.',
+  },
+  {
+    sujet: 'Réparation',
+    question:
+      "Aucune forge, aucun PNJ, aucun matériau n'existe : qui répare, à quel coût, et le maximum est-il restauré entièrement ?",
+    provisoire: 'La structure existe (reparer), aucune source en jeu.',
+  },
+  {
+    sujet: 'Dos encombré',
+    question:
+      "Sac à dos, bouclier de dos et cape se disputaient l'emplacement Dos. Une cape a désormais son propre emplacement, mais sac et bouclier restent en concurrence.",
+    provisoire: 'Sac et bouclier de dos restent exclusifs.',
+  },
+  {
+    sujet: 'Torche et parchemin',
+    question:
+      "Tous deux occupent 2 cases et ne tiennent donc dans aucun emplacement rapide. Faut-il les réduire à 1 case, ou les rendre utilisables depuis le sac ?",
+    provisoire: 'Ils ne sont pas utilisables sans main libre.',
+  },
+  {
+    sujet: 'Emplacements rapides et coût',
+    question:
+      "Utiliser un objet de ceinture coûte-t-il une action de combat comme une attaque ?",
+    provisoire: 'Oui, une action.',
   },
 ];

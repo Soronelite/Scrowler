@@ -67,7 +67,7 @@ export function sauvegarderPersonnage(perso) {
       pv: perso.pv,
       // Les PV maximum ne sont pas stockés : ils se recalculent à partir des
       // statistiques et des passifs de l'inventaire.
-      inventaire: perso.inventaire,
+      portage: perso.portage,
       progression: perso.progression,
     },
   });

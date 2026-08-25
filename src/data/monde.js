@@ -11,7 +11,8 @@ export const ENNEMIS = [
     id: 'rat_geant',
     nom: 'Rat géant',
     icone: '🐀',
-    niveau: 1,
+    rang: 1,
+    variante: 1,
     pv: 10,
     armure: 0,
     attaque: '2d4',
@@ -20,7 +21,8 @@ export const ENNEMIS = [
     id: 'garde',
     nom: 'Garde',
     icone: '💂',
-    niveau: 3,
+    rang: 3,
+    variante: 1,
     pv: 15,
     armure: 4,
     attaque: '2d6',
@@ -30,11 +32,21 @@ export const ENNEMIS = [
 export const ENNEMI_PAR_ID = Object.fromEntries(ENNEMIS.map((e) => [e.id, e]));
 
 /**
- * Niveau d'un ennemi. Un ennemi sans niveau déclaré ne rapporte pas d'XP :
- * le champ doit être renseigné dans sa fiche, jamais deviné ici.
+ * Vocabulaire, à ne pas confondre :
+ *   niveau   → le personnage joueur (1 à 10)
+ *   étage    → palier de donjon (1 à 5)
+ *   rang     → archétype d'ennemi (1 à 10), c'est lui qui donne l'XP
+ *   variante → déclinaison d'un même ennemi (1 à 3)
+ *
+ * Un ennemi sans rang déclaré ne rapporte pas d'XP : le champ doit être
+ * renseigné dans sa fiche, jamais deviné ici.
  */
-export function niveauDe(ennemi) {
-  return ennemi.niveau ?? null;
+export function rangDe(ennemi) {
+  return ennemi.rang ?? null;
+}
+
+export function varianteDe(ennemi) {
+  return ennemi.variante ?? 1;
 }
 
 /* ------------------------------------------------------------------ */

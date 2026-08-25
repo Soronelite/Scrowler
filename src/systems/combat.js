@@ -11,13 +11,19 @@
 
 import { roll } from '../core/dice.js';
 import { PROVISOIRE } from '../rules/provisoire.js';
-import { ENNEMI_PAR_ID, niveauDe } from '../data/monde.js';
+import { ENNEMI_PAR_ID, rangDe, varianteDe } from '../data/monde.js';
 
 export function creerCombat(ennemiId, { ennemiCommence = false } = {}) {
   const modele = ENNEMI_PAR_ID[ennemiId];
   if (!modele) throw new Error(`Ennemi inconnu : ${ennemiId}`);
   return {
-    ennemi: { ...modele, niveau: niveauDe(modele), pv: modele.pv, pvMax: modele.pv },
+    ennemi: {
+      ...modele,
+      rang: rangDe(modele),
+      variante: varianteDe(modele),
+      pv: modele.pv,
+      pvMax: modele.pv,
+    },
     tour: 1,
     aQui: ennemiCommence ? 'ennemi' : 'joueur',
     actionsRestantes: 0,

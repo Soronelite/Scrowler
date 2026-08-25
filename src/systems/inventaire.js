@@ -1,22 +1,18 @@
 /**
- * inventaire.js — Inventaire en grille.
+ * inventaire.js — Le sac : une grille d'instances d'objets.
  *
- * Décidé : grille 4 × 4, chaque objet occupe une forme rectangulaire, jamais
- * en diagonale, rotation autorisée uniquement pour les objets en ligne ou en
- * colonne.
+ * La grille fait 2×2 sans sac à dos, 4×4 avec. Elle ne contient que des
+ * instances (objet + utilisations), jamais des définitions.
  *
- * Ce module ne touche pas à l'interface : il ne fait que placer et déplacer.
+ * Ce module ne connaît ni l'équipement ni les emplacements rapides : il place
+ * et déplace des formes dans un rectangle.
  */
 
 import { objet, estPivotable } from '../data/objets.js';
+import { SAC_SANS_SAC } from '../data/emplacements.js';
+import { instancier } from './equipement.js';
 
-export const LARGEUR = 4;
-export const HAUTEUR = 4;
-
-let compteur = 0;
-const nouvelUid = () => `s${++compteur}`;
-
-export function creerInventaire(largeur = LARGEUR, hauteur = HAUTEUR) {
+export function creerInventaire(largeur = SAC_SANS_SAC.largeur, hauteur = SAC_SANS_SAC.hauteur) {
   return { largeur, hauteur, contenu: [] };
 }
 
@@ -26,7 +22,6 @@ export function forme(objetId, pivote) {
   return pivote ? { l: f.h, h: f.l } : { l: f.l, h: f.h };
 }
 
-/** Cases couvertes par un emplacement. */
 export function cases(slot) {
   const f = forme(slot.objetId, slot.pivote);
   const out = [];
@@ -36,7 +31,6 @@ export function cases(slot) {
   return out;
 }
 
-/** Grille d'occupation : uid ou null pour chaque case. */
 export function occupation(inv, ignoreUid = null) {
   const grille = Array.from({ length: inv.hauteur }, () => Array(inv.largeur).fill(null));
   for (const slot of inv.contenu) {
@@ -48,7 +42,6 @@ export function occupation(inv, ignoreUid = null) {
   return grille;
 }
 
-/** La forme tient-elle à cette position ? */
 export function peutPlacer(inv, objetId, x, y, pivote, ignoreUid = null) {
   const f = forme(objetId, pivote);
   if (x < 0 || y < 0 || x + f.l > inv.largeur || y + f.h > inv.hauteur) return false;
@@ -61,7 +54,6 @@ export function peutPlacer(inv, objetId, x, y, pivote, ignoreUid = null) {
   return true;
 }
 
-/** Première position libre, en testant les deux orientations si possible. */
 export function trouverPlace(inv, objetId) {
   const orientations = estPivotable(objet(objetId)) ? [false, true] : [false];
   for (const pivote of orientations) {
@@ -74,31 +66,45 @@ export function trouverPlace(inv, objetId) {
   return null;
 }
 
-export function placer(inv, objetId, x, y, pivote = false) {
-  if (!peutPlacer(inv, objetId, x, y, pivote)) return null;
-  const slot = { uid: nouvelUid(), objetId, x, y, pivote };
+/** Place une instance existante. Ne crée rien. */
+export function poser(inv, instance, x, y, pivote = false) {
+  if (!peutPlacer(inv, instance.objetId, x, y, pivote)) return null;
+  const slot = { ...instance, x, y, pivote };
   inv.contenu.push(slot);
   return slot;
 }
 
-/** Ajoute un objet là où il rentre. Renvoie null si l'inventaire est plein. */
+/** Crée une instance et la place à un endroit précis. */
+export function placer(inv, objetId, x, y, pivote = false) {
+  return poser(inv, instancier(objetId), x, y, pivote);
+}
+
+/** Crée une instance et la range où elle rentre. Null si le sac est plein. */
 export function ajouter(inv, objetId) {
   const place = trouverPlace(inv, objetId);
   if (!place) return null;
   return placer(inv, objetId, place.x, place.y, place.pivote);
 }
 
+/** Range une instance existante où elle rentre. */
+export function ranger(inv, instance) {
+  const place = trouverPlace(inv, instance.objetId);
+  if (!place) return null;
+  return poser(inv, instance, place.x, place.y, place.pivote);
+}
+
 export function retirer(inv, uid) {
   const i = inv.contenu.findIndex((s) => s.uid === uid);
   if (i === -1) return null;
-  return inv.contenu.splice(i, 1)[0];
+  const [slot] = inv.contenu.splice(i, 1);
+  const { x, y, pivote, ...instance } = slot;
+  return instance;
 }
 
 export function trouver(inv, uid) {
   return inv.contenu.find((s) => s.uid === uid) ?? null;
 }
 
-/** Déplace ou pivote un objet déjà présent. Ne fait rien si la place est prise. */
 export function deplacer(inv, uid, x, y, pivote) {
   const slot = trouver(inv, uid);
   if (!slot) return false;
@@ -121,40 +127,40 @@ export function casesLibres(inv) {
   return occupation(inv).flat().filter((c) => c === null).length;
 }
 
-/** Emplacements dont l'objet correspond à un filtre. */
 export function filtrer(inv, predicat) {
   return inv.contenu.filter((s) => predicat(objet(s.objetId), s));
 }
 
-export function armes(inv) {
-  return filtrer(inv, (o) => o.action?.type === 'attaque');
+/**
+ * Redimensionne le sac (changement de sac à dos).
+ * Les objets qui ne rentrent plus sont renvoyés à l'appelant, jamais détruits
+ * en silence.
+ * @returns {Array} instances expulsées
+ */
+export function redimensionner(inv, largeur, hauteur) {
+  const anciens = inv.contenu;
+  inv.largeur = largeur;
+  inv.hauteur = hauteur;
+  inv.contenu = [];
+
+  const expulses = [];
+  // Les objets les plus encombrants d'abord : ils sont les plus durs à caser.
+  const tries = [...anciens].sort(
+    (a, b) => objet(b.objetId).forme.l * objet(b.objetId).forme.h
+            - objet(a.objetId).forme.l * objet(a.objetId).forme.h
+  );
+
+  for (const slot of tries) {
+    const { x, y, pivote, ...instance } = slot;
+    if (!ranger(inv, instance)) expulses.push(instance);
+  }
+  return expulses;
 }
 
-/** Somme d'un passif sur tout l'inventaire (armure, pvMax, bonusJet...). */
-export function passifCumule(inv, champ) {
-  return inv.contenu.reduce((total, s) => total + (objet(s.objetId).passif?.[champ] ?? 0), 0);
-}
-
-/** Armure totale apportée par les objets possédés. */
-export function armureDesObjets(inv) {
-  return passifCumule(inv, 'armure');
-}
-
-/** PV maximum supplémentaires apportés par les objets possédés. */
-export function pvMaxDesObjets(inv) {
-  return passifCumule(inv, 'pvMax');
-}
-
-/** Sérialisation : le compteur d'uid est reconstruit au chargement. */
 export function restaurer(donnees) {
-  const inv = {
-    largeur: donnees.largeur ?? LARGEUR,
-    hauteur: donnees.hauteur ?? HAUTEUR,
+  return {
+    largeur: donnees.largeur ?? SAC_SANS_SAC.largeur,
+    hauteur: donnees.hauteur ?? SAC_SANS_SAC.hauteur,
     contenu: (donnees.contenu ?? []).map((s) => ({ ...s })),
   };
-  for (const s of inv.contenu) {
-    const n = Number.parseInt(String(s.uid).slice(1), 10);
-    if (Number.isFinite(n)) compteur = Math.max(compteur, n);
-  }
-  return inv;
 }
