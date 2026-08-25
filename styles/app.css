@@ -232,6 +232,7 @@ input[type="text"] {
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 0;
   background: radial-gradient(ellipse 70% 60% at 50% 45%, #262042 0%, var(--ink-900) 75%);
   padding: 3.5rem 1rem 1rem;
 }
@@ -482,7 +483,7 @@ input[type="text"] {
 /* ---------------- XP, niveau, effets ---------------- */
 
 .hud { flex-wrap: wrap; row-gap: 0.3rem; }
-.hud.statique { position: static; background: none; justify-content: center; padding: 0.5rem 0 0; }
+.hud.statique { position: static; background: none; justify-content: center; padding: 0; }
 .hud .niveau { color: var(--brass); }
 .hud .xp-texte { color: var(--bone-dim); }
 .jauge.xp { width: 4rem; }
@@ -699,4 +700,50 @@ button.danger:hover:not(:disabled) {
 @media (max-width: 30rem) {
   .trait { grid-template-columns: 1fr auto; }
   .trait-desc { grid-column: 1 / -1; }
+}
+
+/* ---------------- zone visuelle : image + stats ---------------- */
+
+/*
+ * L'image doit se comprimer pour laisser la place aux stats et aux statuts.
+ * Sans `min-height: 0`, elle garde sa hauteur naturelle et pousse la barre
+ * de stats hors de la zone, qui est en overflow: hidden.
+ */
+.bloc-visuel,
+.bloc-combat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 0;
+  max-height: 100%;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.bloc-visuel > .visuel,
+.bloc-combat > .visuel {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.bloc-visuel > .cadre-visuel,
+.bloc-combat > .cadre-visuel { flex: 0 1 auto; }
+
+.bloc-combat > .stats-ennemi,
+.bloc-visuel > .statuts { flex: 0 0 auto; }
+
+.stats-ennemi {
+  padding: 0.35rem 0.8rem;
+  background: rgba(23, 21, 38, 0.85);
+  border: 1px solid var(--ink-700);
+  border-radius: 999px;
+  gap: 0.7rem;
+  white-space: nowrap;
+}
+.stats-ennemi .renfort { color: var(--brass); font-weight: 600; }
+.stats-ennemi .niveau {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bone-dim);
 }

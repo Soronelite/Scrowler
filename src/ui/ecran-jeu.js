@@ -55,19 +55,24 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
 
     let contenu;
     if (combat && !combat.termine) {
-      contenu = el('div', {}, [
+      contenu = el('div', { class: 'bloc-combat' }, [
         visuel({
           image: combat.ennemi.image,
           nom: combat.ennemi.nom,
           icone: combat.ennemi.icone,
         }),
-        el('div', { class: 'hud statique' }, [
+        el('div', { class: 'hud statique stats-ennemi' }, [
           combat.ennemi.rang ? el('span', { class: 'niveau', text: `Rang ${combat.ennemi.rang}` + (combat.ennemi.variante > 1 ? ` · V${combat.ennemi.variante}` : '') }) : null,
           el('span', { text: `${combat.ennemi.pv}/${combat.ennemi.pvMax} PV` }),
           el('div', { class: 'jauge ennemi' }, [
             el('i', { style: { width: `${(combat.ennemi.pv / combat.ennemi.pvMax) * 100}%` } }),
           ]),
-          el('span', { class: 'armure', text: `${combat.ennemi.armure} armure` }),
+          el('span', { class: 'armure' }, [
+            document.createTextNode(`${armureEffective(combat)} armure`),
+            armureEffective(combat) > combat.ennemi.armure
+              ? el('b', { class: 'renfort', text: ` (+${armureEffective(combat) - combat.ennemi.armure})` })
+              : null,
+          ]),
         ]),
       ]);
     } else if (run.phase === Run.PHASES.FIN) {
@@ -100,7 +105,10 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
       }
     }
 
-    zoneVisuelle.append(hud, el('div', {}, [contenu, statuts.children.length ? statuts : null]));
+    zoneVisuelle.append(
+      hud,
+      el('div', { class: 'bloc-visuel' }, [contenu, statuts.children.length ? statuts : null])
+    );
 
     if (info.effets.length) {
       zoneVisuelle.append(
@@ -372,6 +380,12 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
     modaleNiveau = null;
   };
   return racine;
+}
+
+/** Armure de l'ennemi, effets temporaires compris. */
+function armureEffective(combat) {
+  const temporaire = (combat.effets ?? []).reduce((s, e) => s + (e.armure ?? 0), 0);
+  return combat.ennemi.armure + temporaire;
 }
 
 function detailCourt(def) {

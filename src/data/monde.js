@@ -106,6 +106,7 @@ export const ENNEMIS = [
     id: 'garde',
     nom: 'Garde',
     icone: '💂',
+    image: 'assets/ennemis/garde.jpg',
     familles: ['garde'],
     rang: 3,
     // Décidé : le garde n'apparaît qu'à partir du deuxième étage.
