@@ -35,20 +35,24 @@ src/core/               moteur, aucune règle de jeu
   eventBus.js           bus interne
 
 src/rules/              règles chiffrées
-  stats.js              7 statistiques, PV et armure dérivés
+  stats.js              8 statistiques, PV, armure et actions dérivés
+  xp.js                 courbe d'XP, XP des ennemis, points de compétence
   provisoire.js         TOUTES les valeurs non validées
 
 src/data/               contenu, modifiable sans toucher au moteur
   personnage.js         raretés, races, sexes, classes
-  objets.js             les 12 objets
-  monde.js              ennemis, tables de loot, les 3 rencontres
+  objets.js             les 17 objets
+  monde.js              ennemis (avec leur niveau), tables de loot, 3 rencontres
 
 src/systems/            systèmes de jeu
-  personnage.js         création, PV, armure totale
+  personnage.js         création, PV, armure, actions par tour
   inventaire.js         grille 4×4, formes, rotation
   combat.js             tour par tour, armure, fuite
+  effets.js             effets temporaires et passifs, pipeline de jets
+  progression.js        XP, niveaux, points de compétence
+  competences.js        registre des cibles d'attribution
   loot.js               tirage plafonné par rareté
-  run.js                enchaînement des pièces
+  run.js                enchaînement des pièces, tours, XP
   sauvegarde.js         stockage local
 
 src/ui/                 interface
@@ -77,9 +81,30 @@ permission. Le passage à IndexedDB ne toucherait que `sauvegarde.js`.
 **Inventaire.** Le placement est calculé sur une grille d'occupation, séparé du
 rendu. Déplacement au doigt comme à la souris via Pointer Events.
 
+**Effets temporaires.** Blocage du bouclier, potion de force, potion
+d'endurance et torche passent tous par `effets.js` : une durée, une portée
+(tour ou pièce), et un dépôt sur le pipeline de modificateurs. Aucun de ces
+objets n'est traité comme un cas particulier dans le moteur de combat.
+
+**PV maximum et armure calculés.** Ils ne sont jamais figés dans une variable :
+ramasser un anneau de vigueur ou une armure de mailles est pris en compte
+immédiatement, et rien ne se désynchronise.
+
+**Effets temporaires.** Bouclier, potions de force et d'endurance, torche et
+amulette sont déclarés comme des données dans le catalogue d'objets, jamais
+comme des cas particuliers dans le moteur. Ceux qui touchent un jet sont
+traduits en modificateurs et passent par le pipeline existant, ce qui les rend
+combinables entre eux.
+
+**Expérience.** Courbe et tables d'XP en valeurs explicites dans `rules/xp.js`.
+Le gain vient du niveau de l'ennemi, lu dans ses données : aucune rencontre ne
+contient de valeur d'XP. L'attribution des points passe par un registre ouvert
+(`competences.js`), pour accueillir de vraies compétences plus tard sans
+toucher à l'écran de montée de niveau.
+
 ## Tests
 
-75 tests, sans dépendance externe. Bouton « Lancer les tests » dans
+113 tests, sans dépendance externe. Bouton « Lancer les tests » dans
 `banc-dessai.html`, ou en ligne de commande avec un `package.json` contenant
 `{"type":"module"}`.
 

@@ -130,9 +130,19 @@ export function armes(inv) {
   return filtrer(inv, (o) => o.action?.type === 'attaque');
 }
 
+/** Somme d'un passif sur tout l'inventaire (armure, pvMax, bonusJet...). */
+export function passifCumule(inv, champ) {
+  return inv.contenu.reduce((total, s) => total + (objet(s.objetId).passif?.[champ] ?? 0), 0);
+}
+
 /** Armure totale apportée par les objets possédés. */
 export function armureDesObjets(inv) {
-  return inv.contenu.reduce((total, s) => total + (objet(s.objetId).passif?.armure ?? 0), 0);
+  return passifCumule(inv, 'armure');
+}
+
+/** PV maximum supplémentaires apportés par les objets possédés. */
+export function pvMaxDesObjets(inv) {
+  return passifCumule(inv, 'pvMax');
 }
 
 /** Sérialisation : le compteur d'uid est reconstruit au chargement. */

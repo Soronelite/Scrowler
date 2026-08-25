@@ -1,3 +1,4 @@
+
 /**
  * monde.js — Ennemis, tables de loot et rencontres.
  *
@@ -10,6 +11,7 @@ export const ENNEMIS = [
     id: 'rat_geant',
     nom: 'Rat géant',
     icone: '🐀',
+    niveau: 1,
     pv: 10,
     armure: 0,
     attaque: '2d4',
@@ -18,6 +20,7 @@ export const ENNEMIS = [
     id: 'garde',
     nom: 'Garde',
     icone: '💂',
+    niveau: 3,
     pv: 15,
     armure: 4,
     attaque: '2d6',
@@ -25,6 +28,14 @@ export const ENNEMIS = [
 ];
 
 export const ENNEMI_PAR_ID = Object.fromEntries(ENNEMIS.map((e) => [e.id, e]));
+
+/**
+ * Niveau d'un ennemi. Un ennemi sans niveau déclaré ne rapporte pas d'XP :
+ * le champ doit être renseigné dans sa fiche, jamais deviné ici.
+ */
+export function niveauDe(ennemi) {
+  return ennemi.niveau ?? null;
+}
 
 /* ------------------------------------------------------------------ */
 /* Tables de loot : une table déclare la rareté maximale autorisée.     */
@@ -37,6 +48,23 @@ export const TABLES_LOOT = {
 };
 
 /* ------------------------------------------------------------------ */
+
+/**
+ * Parcours d'une run : suite d'identifiants de rencontres.
+ *
+ * Les rencontres sont réutilisables : chacune peut apparaître plusieurs fois.
+ * L'état d'une pièce (fouilles déjà faites, objets au sol) est suivi par
+ * position dans le parcours, pas par identifiant, donc une répétition repart
+ * bien de zéro.
+ */
+export const PARCOURS = [
+  'cave_lugubre',
+  'cellier',
+  'couloir_garde',
+  'cave_lugubre',
+  'cellier',
+  'couloir_garde',
+];
 
 export const RENCONTRES = [
   {
@@ -125,3 +153,13 @@ export const RENCONTRES = [
     ],
   },
 ];
+
+export const RENCONTRE_PAR_ID = Object.fromEntries(RENCONTRES.map((r) => [r.id, r]));
+
+/** Rencontre occupant une position du parcours. */
+export function rencontreAuRang(rang) {
+  const id = PARCOURS[rang];
+  return id ? RENCONTRE_PAR_ID[id] : null;
+}
+
+export const LONGUEUR_PARCOURS = PARCOURS.length;

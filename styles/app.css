@@ -385,3 +385,103 @@ input[type="text"] {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* ---------------- XP, niveau, effets ---------------- */
+
+.hud { flex-wrap: wrap; row-gap: 0.3rem; }
+.hud.statique { position: static; background: none; justify-content: center; padding: 0.5rem 0 0; }
+.hud .niveau { color: var(--brass); }
+.hud .xp-texte { color: var(--bone-dim); }
+.jauge.xp { width: 4rem; }
+.jauge.xp i { background: var(--brass); }
+
+.effets-actifs {
+  position: absolute;
+  bottom: 0.6rem; left: 0; right: 0;
+  display: flex;
+  gap: 0.4rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 0 0.8rem;
+}
+.pastille {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  color: var(--brass);
+  border: 1px solid var(--brass-deep);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+}
+
+/* ---------------- journal ---------------- */
+
+.zone-texte .xp { color: var(--brass); font-family: var(--mono); font-size: 0.78rem; }
+.zone-texte .niveau {
+  color: var(--brass);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.zone-texte .effet { color: var(--bone-dim); font-style: italic; font-size: 0.85rem; }
+
+.piece-repliee { margin: 0 0 0.5rem; }
+.piece-repliee > summary {
+  cursor: pointer;
+  list-style: none;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--bone-dim);
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--ink-800);
+}
+.piece-repliee > summary::-webkit-details-marker { display: none; }
+.piece-repliee > summary::before { content: "▸ "; color: var(--ink-600); }
+.piece-repliee[open] > summary::before { content: "▾ "; }
+.piece-repliee[open] > summary { color: var(--brass); }
+.piece-repliee > p { opacity: 0.75; }
+
+/* ---------------- compteur d'actions ---------------- */
+
+.compteur-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--bone-dim);
+}
+.points-action { display: flex; gap: 3px; }
+.point-action {
+  width: 0.55rem; height: 0.55rem;
+  border-radius: 50%;
+  border: 1px solid var(--ink-600);
+}
+.point-action.plein { background: var(--brass); border-color: var(--brass); }
+
+/* ---------------- montée de niveau ---------------- */
+
+.modale { background: rgba(23, 21, 38, 0.97); }
+.liste-competences { display: grid; gap: 0.4rem; }
+.competence {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  text-align: left;
+  padding: 0.7rem 0.9rem;
+}
+.competence strong { font-weight: 500; display: block; }
+.competence small { color: var(--bone-dim); font-size: 0.78rem; }
+.valeur-competence { font-family: var(--mono); font-size: 0.8rem; color: var(--brass); white-space: nowrap; }
+
+button.danger {
+  border-color: var(--loss);
+  color: var(--loss);
+}
+button.danger:hover:not(:disabled) {
+  background: var(--loss);
+  border-color: var(--loss);
+  color: var(--ink-900);
+}

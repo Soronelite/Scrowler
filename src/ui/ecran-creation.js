@@ -16,6 +16,7 @@ import {
   pointsRestants,
   pvMax,
   armureDeBase,
+  actionsParTour,
   pourcentage,
 } from '../rules/stats.js';
 import { creerPersonnage } from '../systems/personnage.js';
@@ -136,8 +137,10 @@ export function ecranCreation({ onLancer, onRetour }) {
     }
 
     const s = brouillon.stats;
+    const actions = actionsParTour(s);
     derives.textContent =
       `${pvMax(s)} PV · ${armureDeBase(s)} armure · ` +
+      `${actions} action${actions > 1 ? 's' : ''} par tour · ` +
       `initiative ${pourcentage(s, 'initiative')} %`;
   }
 

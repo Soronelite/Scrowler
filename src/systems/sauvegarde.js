@@ -65,8 +65,10 @@ export function sauvegarderPersonnage(perso) {
       classe: perso.classe,
       stats: perso.stats,
       pv: perso.pv,
-      pvMax: perso.pvMax,
+      // Les PV maximum ne sont pas stockés : ils se recalculent à partir des
+      // statistiques et des passifs de l'inventaire.
       inventaire: perso.inventaire,
+      progression: perso.progression,
     },
   });
 }

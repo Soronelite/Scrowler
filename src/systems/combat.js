@@ -11,15 +11,16 @@
 
 import { roll } from '../core/dice.js';
 import { PROVISOIRE } from '../rules/provisoire.js';
-import { ENNEMI_PAR_ID } from '../data/monde.js';
+import { ENNEMI_PAR_ID, niveauDe } from '../data/monde.js';
 
 export function creerCombat(ennemiId, { ennemiCommence = false } = {}) {
   const modele = ENNEMI_PAR_ID[ennemiId];
   if (!modele) throw new Error(`Ennemi inconnu : ${ennemiId}`);
   return {
-    ennemi: { ...modele, pv: modele.pv, pvMax: modele.pv },
+    ennemi: { ...modele, niveau: niveauDe(modele), pv: modele.pv, pvMax: modele.pv },
     tour: 1,
     aQui: ennemiCommence ? 'ennemi' : 'joueur',
+    actionsRestantes: 0,
     termine: false,
     vainqueur: null,
   };
@@ -41,7 +42,7 @@ export function frapperEnnemi(combat, des, { rng, pipeline, personnage }) {
   const jet = roll(des, {
     rng,
     pipeline,
-    tags: ['degats'],
+    tags: ['degats', 'joueur'],
     actor: personnage,
     target: combat.ennemi,
   });

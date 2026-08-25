@@ -2,13 +2,16 @@
  * ecran-jeu.js — Interface de run.
  *
  * Découpage décidé : deux quarts de zone visuelle, un quart de texte,
- * un quart d'actions.
+ * un quart d'actions. Les trois zones ont une hauteur fixe ; le journal
+ * défile à l'intérieur de la sienne et ne fait jamais grandir la page.
  */
 
 import { el, vider, visuelManquant } from './dom.js';
-import { objet } from '../data/objets.js';
+import { RENCONTRES } from '../data/monde.js';
 import * as Run from '../systems/run.js';
+import { ciblesDisponibles } from '../systems/competences.js';
 import { vueInventaire } from './vue-inventaire.js';
+import { PROVISOIRE } from '../rules/provisoire.js';
 
 export function ecranJeu({ personnage, graine, onTerminer }) {
   const run = Run.creerRun(personnage, { graine });
@@ -20,25 +23,32 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
   const racine = el('div', { class: 'ecran jeu' }, [zoneVisuelle, zoneTexte, zoneActions]);
 
   let inventaireOuvert = null;
-  let dernierJournal = 0;
+  let modaleNiveau = null;
+  const piecesDepliees = new Set();
 
   /* ---------------- zone visuelle ---------------- */
 
   function rendreVisuel() {
     vider(zoneVisuelle);
 
-    const piece = Run.pieceCourante(run);
-    const combat = run.combat;
     const info = Run.resume(run);
+    const combat = run.combat;
+    const piece = Run.pieceCourante(run);
+
+    const xpTexte = info.xp.complet
+      ? 'XP max'
+      : `${info.xp.actuel}/${info.xp.requis} XP`;
+    const xpPart = info.xp.complet ? 1 : info.xp.actuel / info.xp.requis;
 
     const hud = el('div', { class: 'hud' }, [
       el('span', { class: 'nom', text: personnage.nom }),
-      el('span', { class: `pv${personnage.pv <= personnage.pvMax / 3 ? ' bas' : ''}` }, [
-        document.createTextNode(`${personnage.pv}/${personnage.pvMax} PV`),
+      el('span', { class: 'niveau', text: `Niv. ${info.niveau}` }),
+      el('div', { class: 'jauge xp', title: xpTexte }, [
+        el('i', { style: { width: `${xpPart * 100}%` } }),
       ]),
-      el('div', { class: 'jauge' }, [
-        el('i', { style: { width: `${(personnage.pv / personnage.pvMax) * 100}%` } }),
-      ]),
+      el('span', { class: 'xp-texte', text: xpTexte }),
+      el('span', { class: `pv${info.pv <= info.pvMax / 3 ? ' bas' : ''}`, text: `${info.pv}/${info.pvMax} PV` }),
+      el('div', { class: 'jauge' }, [el('i', { style: { width: `${(info.pv / info.pvMax) * 100}%` } })]),
       el('span', { class: 'armure', text: `${info.armure} armure` }),
       el('span', { class: 'piece', text: `Pièce ${info.piece.piece}/${info.piece.total}` }),
     ]);
@@ -47,7 +57,8 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
     if (combat && !combat.termine) {
       contenu = el('div', {}, [
         visuelManquant(combat.ennemi.nom, combat.ennemi.icone),
-        el('div', { class: 'hud', style: { position: 'static', background: 'none', justifyContent: 'center' } }, [
+        el('div', { class: 'hud statique' }, [
+          combat.ennemi.niveau ? el('span', { class: 'niveau', text: `Niv. ${combat.ennemi.niveau}` }) : null,
           el('span', { text: `${combat.ennemi.pv}/${combat.ennemi.pvMax} PV` }),
           el('div', { class: 'jauge ennemi' }, [
             el('i', { style: { width: `${(combat.ennemi.pv / combat.ennemi.pvMax) * 100}%` } }),
@@ -62,25 +73,65 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
     }
 
     zoneVisuelle.append(hud, contenu);
+
+    if (info.effets.length) {
+      zoneVisuelle.append(
+        el('div', { class: 'effets-actifs' }, info.effets.map((label) =>
+          el('span', { class: 'pastille', text: label })
+        ))
+      );
+    }
   }
 
   /* ---------------- journal ---------------- */
 
   function rendreJournal() {
-    for (let i = dernierJournal; i < run.journal.length; i++) {
-      const entree = run.journal[i];
-      zoneTexte.append(el('p', { class: entree.type, text: entree.texte }));
+    vider(zoneTexte);
+
+    const groupes = [];
+    for (const entree of run.journal) {
+      const dernier = groupes[groupes.length - 1];
+      if (dernier && dernier.piece === entree.piece) dernier.entrees.push(entree);
+      else groupes.push({ piece: entree.piece, entrees: [entree] });
     }
-    dernierJournal = run.journal.length;
+
+    groupes.forEach((groupe, index) => {
+      const courant = index === groupes.length - 1;
+      const lignes = groupe.entrees.map((e) => el('p', { class: e.type, text: e.texte }));
+
+      if (courant) {
+        zoneTexte.append(...lignes);
+        return;
+      }
+
+      // Les pièces précédentes sont repliées pour garder le cadre lisible.
+      const ouvert = piecesDepliees.has(index);
+      const titre = RENCONTRES[groupe.piece]?.lieu ?? 'Passage';
+      const bloc = el('details', { class: 'piece-repliee', open: ouvert }, [
+        el('summary', { text: titre }),
+        ...lignes,
+      ]);
+      bloc.addEventListener('toggle', () => {
+        if (bloc.open) piecesDepliees.add(index);
+        else piecesDepliees.delete(index);
+      });
+      zoneTexte.append(bloc);
+    });
+
     zoneTexte.scrollTop = zoneTexte.scrollHeight;
   }
 
   /* ---------------- actions ---------------- */
 
   function utilisableMaintenant(def) {
-    if (!def.action) return false;
+    const a = def.action;
+    if (!a) return false;
+    if (Run.attendUnChoixDeCompetence(run)) return false;
     const enCombat = run.phase === Run.PHASES.COMBAT;
-    if (def.action.type === 'attaque' || def.action.cible === 'ennemi') return enCombat;
+    if (a.type === 'attaque' || a.cible === 'ennemi' || a.seulementEnCombat) {
+      return enCombat && run.combat.actionsRestantes > 0;
+    }
+    if (enCombat && run.combat.actionsRestantes <= 0) return false;
     return run.phase !== Run.PHASES.FIN;
   }
 
@@ -90,14 +141,25 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
     if (run.phase === Run.PHASES.FIN) {
       zoneActions.append(
         el('div', { class: 'rangee' }, [
-          el('button', {
-            class: 'primaire',
-            text: 'Terminer la run',
-            onclick: () => onTerminer(run),
-          }),
+          el('button', { class: 'primaire', text: 'Terminer la run', onclick: () => onTerminer(run) }),
         ])
       );
       return;
+    }
+
+    const bloque = Run.attendUnChoixDeCompetence(run);
+
+    if (run.phase === Run.PHASES.COMBAT) {
+      const info = Run.resume(run);
+      zoneActions.append(
+        el('div', { class: 'compteur-actions' }, [
+          el('span', { text: `Tour ${run.combat.tour}` }),
+          el('span', { class: 'points-action' }, Array.from({ length: info.actionsMax }, (_, i) =>
+            el('span', { class: `point-action${i < info.actions ? ' plein' : ''}` })
+          )),
+          el('span', { text: `${info.actions} / ${info.actionsMax} action${info.actionsMax > 1 ? 's' : ''}` }),
+        ])
+      );
     }
 
     const rencontre = el('div', { class: 'rangee' });
@@ -106,6 +168,7 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
         el('button', {
           class: action.type === 'avancer' ? 'primaire' : '',
           text: action.libelle,
+          disabled: bloque,
           onclick: () => Run.executerAction(run, action.id),
         })
       );
@@ -120,7 +183,11 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
 
       if (repli) {
         raccourcis.append(
-          el('button', { class: 'raccourci', onclick: () => Run.utiliserAttaqueDeRepli(run) }, [
+          el('button', {
+            class: 'raccourci',
+            disabled: bloque || run.combat.actionsRestantes <= 0,
+            onclick: () => Run.utiliserAttaqueDeRepli(run),
+          }, [
             el('span', { class: 'icone', text: '✊' }),
             el('span', {}, [
               document.createTextNode(repli.nom),
@@ -132,7 +199,11 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
 
       for (const { slot, def } of utilisables) {
         raccourcis.append(
-          el('button', { class: 'raccourci', onclick: () => Run.utiliserObjet(run, slot.uid) }, [
+          el('button', {
+            class: 'raccourci',
+            disabled: !utilisableMaintenant(def),
+            onclick: () => Run.utiliserObjet(run, slot.uid),
+          }, [
             el('span', { class: 'icone', text: def.icone }),
             el('span', {}, [
               document.createTextNode(def.action.verbe),
@@ -145,11 +216,65 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
       zoneActions.append(raccourcis);
     }
 
-    zoneActions.append(
-      el('div', { class: 'rangee' }, [
-        el('button', { class: 'discret', text: 'Inventaire', onclick: ouvrirInventaire }),
-      ])
-    );
+    const bas = el('div', { class: 'rangee' }, [
+      el('button', { class: 'discret', text: 'Inventaire', onclick: ouvrirInventaire }),
+    ]);
+
+    if (run.phase === Run.PHASES.COMBAT && PROVISOIRE.combat.boutonTerminerLeTour) {
+      bas.append(
+        el('button', {
+          class: 'discret',
+          text: 'Terminer le tour',
+          disabled: bloque,
+          onclick: () => Run.terminerLeTour(run),
+        })
+      );
+    }
+
+    zoneActions.append(bas);
+  }
+
+  /* ---------------- montée de niveau ---------------- */
+
+  function rendreModaleNiveau() {
+    const necessaire = Run.attendUnChoixDeCompetence(run);
+
+    if (!necessaire) {
+      modaleNiveau?.remove();
+      modaleNiveau = null;
+      return;
+    }
+
+    modaleNiveau?.remove();
+
+    const points = personnage.progression.pointsDisponibles;
+    const cibles = ciblesDisponibles(personnage);
+
+    modaleNiveau = el('div', { class: 'plein-ecran modale' }, [
+      el('header', {}, [
+        el('h2', { text: 'Niveau supérieur' }),
+        el('span', { class: 'etiquette', text: `Niveau ${personnage.progression.niveau}` }),
+      ]),
+      el('p', {
+        class: 'note',
+        text: `${points} point${points > 1 ? 's' : ''} de compétence à attribuer. Le choix est nécessaire pour continuer.`,
+      }),
+      el('div', { class: 'liste-competences' }, cibles.map((c) =>
+        el('button', { class: 'competence', onclick: () => Run.attribuerPoint(run, c.id) }, [
+          el('span', {}, [
+            el('strong', { text: c.nom }),
+            el('small', { text: c.description ?? '' }),
+          ]),
+          el('span', { class: 'valeur-competence', text: c.valeur ? c.valeur(personnage) : '' }),
+        ])
+      )),
+      el('p', {
+        class: 'note',
+        text: 'Aucune liste de compétences n’ayant été définie, les points vont aux statistiques existantes.',
+      }),
+    ]);
+
+    document.body.append(modaleNiveau);
   }
 
   /* ---------------- inventaire ---------------- */
@@ -163,6 +288,7 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
         Run.utiliserObjet(run, uid);
         fermerInventaire();
       },
+      onJeter: (uid) => Run.jeterObjet(run, uid),
       onFermer: fermerInventaire,
     });
     document.body.append(inventaireOuvert);
@@ -183,18 +309,27 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
     rendreVisuel();
     rendreJournal();
     rendreActions();
+    rendreModaleNiveau();
     if (inventaireOuvert) inventaireOuvert.rafraichir();
   }
 
   run.onChangement = rendre;
   rendre();
 
-  racine.demonter = fermerInventaire;
+  racine.demonter = () => {
+    fermerInventaire();
+    modaleNiveau?.remove();
+    modaleNiveau = null;
+  };
   return racine;
 }
 
 function detailCourt(def) {
-  if (def.action.des) return def.action.des;
-  if (def.action.pv) return `+${def.action.pv} PV`;
+  const a = def.action;
+  if (a.des) return a.des;
+  if (a.pv) return `+${a.pv} PV`;
+  if (a.effet?.armure) return `+${a.effet.armure} armure`;
+  if (a.effet?.degats) return `+${a.effet.degats} dégâts`;
+  if (a.effet?.actions) return `+${a.effet.actions} action`;
   return '';
 }

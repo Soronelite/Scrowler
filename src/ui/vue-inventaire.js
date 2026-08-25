@@ -15,8 +15,9 @@ import * as Inv from '../systems/inventaire.js';
 
 const SEUIL_DEPLACEMENT = 6; // pixels avant de considérer que c'est un glissé
 
-export function vueInventaire({ inventaire, onFermer, onUtiliser, utilisableMaintenant }) {
+export function vueInventaire({ inventaire, onFermer, onUtiliser, onJeter, utilisableMaintenant }) {
   let selection = null;
+  let confirmationJet = null;
 
   const grille = el('div', {
     class: 'grille',
@@ -140,6 +141,28 @@ export function vueInventaire({ inventaire, onFermer, onUtiliser, utilisableMain
               signaler('Pas assez de place pour pivoter.');
               return;
             }
+            rendre();
+          },
+        })
+      );
+    }
+
+    // Jeter : destruction définitive, donc confirmation en deux temps.
+    if (onJeter) {
+      const aConfirmer = confirmationJet === slot.uid;
+      actions.append(
+        el('button', {
+          class: aConfirmer ? 'danger' : '',
+          text: aConfirmer ? `Confirmer : détruire ${def.nom}` : 'Jeter',
+          onclick: () => {
+            if (!aConfirmer) {
+              confirmationJet = slot.uid;
+              rendreFiche();
+              return;
+            }
+            confirmationJet = null;
+            selection = null;
+            onJeter(slot.uid);
             rendre();
           },
         })
@@ -302,21 +325,41 @@ export function vueInventaire({ inventaire, onFermer, onUtiliser, utilisableMain
 }
 
 function descriptionDe(def, forme) {
+  const total = forme.l * forme.h;
   const dimensions =
-    forme.l === 1 && forme.h === 1
+    total === 1
       ? '1 case'
-      : `${forme.l * forme.h} cases en ${forme.l === 1 ? 'colonne' : 'ligne'}`;
+      : forme.l === forme.h
+        ? `${total} cases en carré (${forme.l}×${forme.h})`
+        : `${total} cases en ${forme.l === 1 ? 'colonne' : 'ligne'}`;
 
-  let effet = 'Aucun effet.';
-  if (def.action?.type === 'attaque' || def.action?.type === 'degats') {
-    effet = `${def.action.des} dégâts.`;
-  } else if (def.action?.type === 'soin') {
-    effet = `Rend ${def.action.pv} PV.`;
-  } else if (def.passif?.armure) {
-    effet = `Passif : +${def.passif.armure} armure.`;
-  } else if (def.action?.type === 'inerte') {
-    effet = 'Aucun effet pour l’instant.';
+  const morceaux = [];
+
+  if (def.passif?.armure) morceaux.push(`Passif : +${def.passif.armure} armure`);
+  if (def.passif?.pvMax) morceaux.push(`Passif : +${def.passif.pvMax} PV maximum`);
+  if (def.passif?.bonusJet) morceaux.push(`Passif : +${def.passif.bonusJet} aux jets de dés`);
+
+  const a = def.action;
+  if (a?.type === 'attaque' || a?.type === 'degats') {
+    morceaux.push(`${a.verbe} : ${a.des} dégâts`);
+  } else if (a?.type === 'soin') {
+    morceaux.push(`${a.verbe} : rend ${a.pv} PV`);
+  } else if (a?.type === 'effet') {
+    const e = a.effet;
+    const detail = e.armure
+      ? `+${e.armure} armure`
+      : e.degats
+        ? `+${e.degats} dégâts`
+        : e.actions
+          ? `+${e.actions} action`
+          : e.bonusLoot
+            ? 'meilleur butin'
+            : 'effet';
+    const duree = e.dureePieces ? `pendant ${e.dureePieces} pièce` : 'au prochain tour';
+    morceaux.push(`${a.verbe} : ${detail} ${duree}`);
   }
 
-  return `${effet} — ${dimensions}`;
+  if (!morceaux.length) morceaux.push('Aucun effet');
+
+  return `${morceaux.join('. ')}. — ${dimensions}`;
 }
