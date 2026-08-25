@@ -6,7 +6,7 @@
  * défile à l'intérieur de la sienne et ne fait jamais grandir la page.
  */
 
-import { el, vider, visuelManquant } from './dom.js';
+import { el, vider, visuel, visuelManquant } from './dom.js';
 
 import * as Run from '../systems/run.js';
 import { ciblesDisponibles } from '../systems/competences.js';
@@ -56,7 +56,11 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
     let contenu;
     if (combat && !combat.termine) {
       contenu = el('div', {}, [
-        visuelManquant(combat.ennemi.nom, combat.ennemi.icone),
+        visuel({
+          image: combat.ennemi.image,
+          nom: combat.ennemi.nom,
+          icone: combat.ennemi.icone,
+        }),
         el('div', { class: 'hud statique' }, [
           combat.ennemi.rang ? el('span', { class: 'niveau', text: `Rang ${combat.ennemi.rang}` + (combat.ennemi.variante > 1 ? ` · V${combat.ennemi.variante}` : '') }) : null,
           el('span', { text: `${combat.ennemi.pv}/${combat.ennemi.pvMax} PV` }),
@@ -75,7 +79,10 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
     } else if (run.phase === Run.PHASES.FIN_ETAGE) {
       contenu = visuelManquant(`Escalier vers l'étage ${run.etage + 1}`);
     } else {
-      contenu = visuelManquant(piece ? piece.visuel : 'Lieu');
+      contenu = visuel({
+        image: piece?.def?.image,
+        nom: piece?.def?.visuel ?? 'Lieu',
+      });
     }
 
     const statuts = el('div', { class: 'statuts' });

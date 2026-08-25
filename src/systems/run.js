@@ -125,11 +125,19 @@ function donnerXp(run, montant, raison) {
   }
 
   for (const gain of resultat.niveauxGagnes) {
+    // Chaque niveau rend une part des PV maximum.
+    const rendus = soigner(
+      run.personnage,
+      Math.ceil(pvMaxTotal(run.personnage) * Prog.SOIN_MONTEE_DE_NIVEAU)
+    );
     noter(
       run,
       `NIVEAU SUPÉRIEUR ! Niveau ${gain.niveau} — ${gain.points} point${gain.points > 1 ? 's' : ''} de compétence.`,
       'niveau'
     );
+    if (rendus > 0) {
+      noter(run, `Tu récupères ${rendus} PV (${run.personnage.pv}/${pvMaxTotal(run.personnage)}).`, 'soin');
+    }
   }
 
   const avancement = Prog.avancement(prog);

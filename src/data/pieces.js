@@ -23,18 +23,19 @@ export const PIECES = [
       "L'air est froid et humide. Les murs de pierre sont couverts de traces de moisissure et l'obscurité rend difficile de distinguer les recoins de la cave. Une odeur désagréable flotte dans l'air.",
     etages: [1, 2, 3],
     eclairage: { chance: 15 },
-    rencontre: { chance: 35, chanceSiEclairee: 60, familles: ['vermine'] },
+    rencontre: { chance: 48, chanceSiEclairee: 68, familles: ['vermine'] },
     fouille: { table: 'jusqu_commun' },
   },
   {
     id: 'cellier',
     nom: 'Cellier',
     visuel: 'Ancien cellier',
+    image: 'assets/pieces/cellier.jpg',
     description:
       'De vieilles étagères en bois occupent les murs du cellier. Des caisses poussiéreuses sont empilées dans les coins et quelques bocaux oubliés depuis longtemps couvrent les étagères. Malgré l’abandon des lieux, certaines réserves semblent encore intactes.',
     etages: [1, 2, 3],
     eclairage: { chance: 25 },
-    rencontre: { chance: 25, chanceSiEclairee: 50, familles: ['vermine'] },
+    rencontre: { chance: 40, chanceSiEclairee: 62, familles: ['vermine'] },
     fouille: { table: 'jusqu_peu_commun' },
   },
   {
@@ -45,7 +46,7 @@ export const PIECES = [
       'Un âtre éteint occupe tout un mur. Des ustensiles rouillés pendent encore à leurs crochets et une longue table de bois porte les traces de découpes anciennes. Quelque chose a fouillé les réserves avant toi.',
     etages: [1, 2, 3],
     eclairage: { chance: 30 },
-    rencontre: { chance: 30, chanceSiEclairee: 55, familles: ['vermine'] },
+    rencontre: { chance: 45, chanceSiEclairee: 65, familles: ['vermine'] },
     fouille: { table: 'jusqu_peu_commun' },
   },
   {
@@ -56,18 +57,19 @@ export const PIECES = [
       'Le couloir est étroit et faiblement éclairé. Les dalles sonnent creux sous les pas et le passage se resserre encore vers le fond.',
     etages: [1, 2, 3, 4, 5],
     eclairage: { chance: 45 },
-    rencontre: { chance: 30, chanceSiEclairee: 55, familles: ['garde'] },
+    rencontre: { chance: 45, chanceSiEclairee: 65, familles: ['vermine', 'garde'] },
     fouille: { table: 'jusqu_commun' },
   },
   {
     id: 'puits',
     nom: 'Puits asséché',
     visuel: 'Puits asséché',
+    image: 'assets/pieces/puits.jpg',
     description:
       "Un puits de pierre s'ouvre au centre de la salle, sec depuis longtemps. Des cordes pourries pendent le long de la margelle et l'écho renvoie des bruits qui ne viennent pas de toi.",
     etages: [1, 2, 3, 4],
     eclairage: { chance: 10 },
-    rencontre: { chance: 35, chanceSiEclairee: 60, familles: ['vermine', 'mort-vivant'] },
+    rencontre: { chance: 48, chanceSiEclairee: 68, familles: ['vermine', 'mort-vivant'] },
     fouille: { table: 'jusqu_peu_commun' },
   },
   {
@@ -78,7 +80,7 @@ export const PIECES = [
       'Une rangée de cellules aux barreaux tordus longe le mur. Les serrures ont été forcées de l’intérieur. Sur le sol, des chaînes brisées et de la paille noircie.',
     etages: [2, 3, 4, 5],
     eclairage: { chance: 20 },
-    rencontre: { chance: 45, chanceSiEclairee: 65, familles: ['mort-vivant', 'garde'] },
+    rencontre: { chance: 58, chanceSiEclairee: 74, familles: ['mort-vivant', 'garde'] },
     fouille: { table: 'jusqu_commun' },
   },
   {
@@ -89,7 +91,7 @@ export const PIECES = [
       'Des bancs renversés, un râtelier vide et les restes d’un repas interrompu. Quelqu’un montait la garde ici, et n’est jamais parti.',
     etages: [2, 3, 4, 5],
     eclairage: { chance: 50 },
-    rencontre: { chance: 50, chanceSiEclairee: 70, familles: ['garde'] },
+    rencontre: { chance: 60, chanceSiEclairee: 76, familles: ['garde'] },
     fouille: { table: 'jusqu_peu_commun' },
   },
   {
@@ -100,7 +102,7 @@ export const PIECES = [
       'Des niches funéraires s’enfoncent dans la roche, la plupart descellées. Une poussière fine et sèche recouvre tout, et le silence y a un poids particulier.',
     etages: [2, 3, 4, 5],
     eclairage: { chance: 10 },
-    rencontre: { chance: 50, chanceSiEclairee: 70, familles: ['mort-vivant'] },
+    rencontre: { chance: 60, chanceSiEclairee: 76, familles: ['mort-vivant'] },
     fouille: { table: 'jusqu_peu_commun' },
   },
   {
@@ -111,7 +113,7 @@ export const PIECES = [
       'Des supports d’armes vides bordent les murs, mais quelques pièces sont restées en place, oubliées ou trop lourdes à emporter. Une odeur de graisse et de métal froid.',
     etages: [3, 4, 5],
     eclairage: { chance: 40 },
-    rencontre: { chance: 55, chanceSiEclairee: 70, familles: ['garde'] },
+    rencontre: { chance: 65, chanceSiEclairee: 78, familles: ['garde'] },
     fouille: { table: 'jusqu_peu_commun' },
   },
   {
@@ -122,7 +124,7 @@ export const PIECES = [
       'L’autel a été renversé et les symboles grattés jusqu’à la pierre. Des cierges consumés forment des flaques de cire durcie, et quelque chose veille encore ici.',
     etages: [3, 4, 5],
     eclairage: { chance: 25 },
-    rencontre: { chance: 60, chanceSiEclairee: 75, familles: ['mort-vivant'] },
+    rencontre: { chance: 68, chanceSiEclairee: 80, familles: ['mort-vivant'] },
     fouille: { table: 'jusqu_peu_commun' },
   },
 ];

@@ -26,6 +26,23 @@ export function vider(noeud) {
   return noeud;
 }
 
+/**
+ * Visuel d'une pièce ou d'un ennemi.
+ * Si aucune image n'est fournie, on retombe sur l'encadré de remplacement,
+ * et si le fichier manque, l'encadré prend le relais à l'exécution.
+ */
+export function visuel({ image, nom, icone = null }) {
+  if (!image) return visuelManquant(nom, icone);
+
+  const cadre = el('div', { class: 'visuel' });
+  const img = el('img', { src: image, alt: nom, loading: 'lazy', decoding: 'async' });
+  img.addEventListener('error', () => {
+    cadre.replaceWith(visuelManquant(nom, icone));
+  });
+  cadre.append(img);
+  return cadre;
+}
+
 /** Encadré de remplacement pour un visuel non fourni. */
 export function visuelManquant(nom, icone = null) {
   return el('div', { class: 'cadre-visuel' }, [

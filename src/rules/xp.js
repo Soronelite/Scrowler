@@ -34,6 +34,9 @@ export const XP_PAR_RANG_ENNEMI = {
   12: 237,
 };
 
+/** Part des PV maximum rendue à chaque montée de niveau. */
+export const SOIN_MONTEE_DE_NIVEAU = 0.25;
+
 /** XP gagnée en passant à une nouvelle pièce. */
 export const XP_PROGRESSION = 2;
 

@@ -648,3 +648,23 @@ button.danger:hover:not(:disabled) {
   padding-top: 0.7rem;
   margin-top: 0.9rem;
 }
+
+/* ---------------- visuels ---------------- */
+
+.visuel {
+  max-width: min(100%, 26rem);
+  max-height: 100%;
+  display: flex;
+  border: 1px solid var(--ink-700);
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: 0 6px 26px rgba(0, 0, 0, 0.45);
+}
+.visuel img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  /* Les gravures sont sur fond noir : on les fond dans le décor. */
+  background: #000;
+}

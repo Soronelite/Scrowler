@@ -150,7 +150,7 @@ export const OBJETS = [
     id: 'sac_a_dos',
     nom: 'Sac à dos',
     categorie: 'contenant',
-    rarete: 'frequent',
+    rarete: 'peu_commun',
     icone: '🎒',
     port: PORTS.SAC,
     forme: { l: 2, h: 2 },

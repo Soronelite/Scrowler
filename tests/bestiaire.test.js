@@ -21,14 +21,15 @@ suite('Bestiaire', ({ test }) => {
 
   test('les variantes du garde suivent la table proposée', () => {
     const g = ENNEMI_PAR_ID.garde;
-    expect(statsDeVariante(g, 1)).toEqual({ pv: 15, armure: 4, initiative: 3 });
+    expect(statsDeVariante(g, 1)).toEqual({ pv: 15, armure: 2, initiative: 3 });
+    expect(statsDeVariante(g, 2)).toEqual({ pv: 20, armure: 4, initiative: 4 });
     expect(statsDeVariante(g, 3)).toEqual({ pv: 26, armure: 6, initiative: 5 });
   });
 
-  test('la variante 1 du garde reprend les valeurs décidées', () => {
-    const v = statsDeVariante(ENNEMI_PAR_ID.garde, 1);
-    expect(v.pv).toBe(15);
-    expect(v.armure).toBe(4);
+  test('l’armure du garde monte avec la variante', () => {
+    const g = ENNEMI_PAR_ID.garde;
+    expect(statsDeVariante(g, 1).armure < statsDeVariante(g, 2).armure).toBe(true);
+    expect(statsDeVariante(g, 2).armure < statsDeVariante(g, 3).armure).toBe(true);
   });
 
   test('chaque ennemi déclare au moins trois attaques', () => {

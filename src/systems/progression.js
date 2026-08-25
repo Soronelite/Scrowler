@@ -6,6 +6,7 @@
  */
 
 import {
+  SOIN_MONTEE_DE_NIVEAU,
   NIVEAU_INITIAL,
   NIVEAU_MAX,
   SEUILS,
@@ -78,3 +79,5 @@ export function depenserPoint(prog) {
   prog.pointsDisponibles--;
   return true;
 }
+
+export { SOIN_MONTEE_DE_NIVEAU };

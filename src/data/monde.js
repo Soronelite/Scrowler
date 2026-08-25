@@ -23,6 +23,7 @@ export const ENNEMIS = [
     id: 'rat_geant',
     nom: 'Rat géant',
     icone: '🐀',
+    image: 'assets/ennemis/rat_geant.jpg',
     familles: ['vermine'],
     rang: 1,
     etageMini: 1,
@@ -107,9 +108,11 @@ export const ENNEMIS = [
     rang: 3,
     // Décidé : le garde n'apparaît qu'à partir du deuxième étage.
     etageMini: 2,
+    // Armure allégée sur les deux premières variantes : à 4, une épée courte
+    // (1d6) ne passait quasiment jamais et le combat était insoluble.
     variantes: [
-      { pv: 15, armure: 4, initiative: 3 },
-      { pv: 20, armure: 5, initiative: 4 },
+      { pv: 15, armure: 2, initiative: 3 },
+      { pv: 20, armure: 4, initiative: 4 },
       { pv: 26, armure: 6, initiative: 5 },
     ],
     attaques: [

@@ -32,6 +32,7 @@ export function creerCombat(ennemiId, { ennemiCommence = false, variante = 1 } =
       id: modele.id,
       nom: modele.nom,
       icone: modele.icone,
+      image: modele.image,
       rang: modele.rang,
       variante,
       pv: stats.pv,

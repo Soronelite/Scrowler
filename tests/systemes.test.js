@@ -184,10 +184,10 @@ suite('Combat', ({ test }) => {
     expect(c.ennemi.armure).toBe(0);
   });
 
-  test('le garde a 15 PV et 4 d’armure', () => {
+  test('le garde a 15 PV et 2 d’armure en variante 1', () => {
     const c = creerCombat('garde');
     expect(c.ennemi.pv).toBe(15);
-    expect(c.ennemi.armure).toBe(4);
+    expect(c.ennemi.armure).toBe(2);
   });
 
   test('un coup d’épée retire des PV au rat', () => {
