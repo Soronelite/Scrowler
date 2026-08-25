@@ -21,6 +21,8 @@ import {
   pourcentage,
 } from '../rules/stats.js';
 import { creerPersonnage } from '../systems/personnage.js';
+import { traitsDIdentite } from '../data/traits.js';
+import { trait } from '../data/traits.js';
 import { sauvegarderPersonnage, SAUVEGARDE_DISPONIBLE } from '../systems/sauvegarde.js';
 
 export function ecranCreation({ onLancer, onRetour }) {
@@ -53,6 +55,8 @@ export function ecranCreation({ onLancer, onRetour }) {
             brouillon[cle] = opt.id;
             for (const b of boite.children) b.setAttribute('aria-pressed', 'false');
             bouton.setAttribute('aria-pressed', 'true');
+            rendreTraits();
+            rendreStats();
           },
         },
         [
@@ -66,6 +70,27 @@ export function ecranCreation({ onLancer, onRetour }) {
   }
 
   /* ---------------- statistiques ---------------- */
+
+  const listeTraits = el('div', { class: 'traits' });
+
+  function rendreTraits() {
+    vider(listeTraits);
+    const ids = traitsDIdentite(brouillon);
+    if (ids.length === 0) {
+      listeTraits.append(el('p', { class: 'note', text: 'Aucun trait.' }));
+      return;
+    }
+    for (const id of ids) {
+      const t = trait(id);
+      listeTraits.append(
+        el('div', { class: `trait ${t.type}` }, [
+          el('span', { class: 'trait-nom', text: t.nom }),
+          el('span', { class: 'trait-desc', text: t.description }),
+          el('span', { class: 'trait-origine', text: t.origine }),
+        ])
+      );
+    }
+  }
 
   const listeStats = el('div');
   const compteur = el('span', { class: 'points-restants' });
@@ -173,6 +198,10 @@ export function ecranCreation({ onLancer, onRetour }) {
       el('p', { class: 'note', text: 'Seul le chevalier est disponible pour ce test.' }),
     ]),
     el('div', { class: 'bloc' }, [
+      el('h3', { text: 'Traits' }),
+      listeTraits,
+    ]),
+    el('div', { class: 'bloc' }, [
       el('h3', {}, [document.createTextNode('Statistiques'), compteur]),
       listeStats,
       derives,
@@ -238,6 +267,7 @@ export function ecranCreation({ onLancer, onRetour }) {
     page.scrollIntoView({ block: 'end', behavior: 'smooth' });
   }
 
+  rendreTraits();
   rendreStats();
   return racine;
 }

@@ -21,9 +21,9 @@ suite('Bestiaire', ({ test }) => {
 
   test('les variantes du garde suivent la table proposée', () => {
     const g = ENNEMI_PAR_ID.garde;
-    expect(statsDeVariante(g, 1)).toEqual({ pv: 15, armure: 2, initiative: 3 });
-    expect(statsDeVariante(g, 2)).toEqual({ pv: 20, armure: 4, initiative: 4 });
-    expect(statsDeVariante(g, 3)).toEqual({ pv: 26, armure: 6, initiative: 5 });
+    expect(statsDeVariante(g, 1)).toEqual({ pv: 15, armure: 2, initiative: 2 });
+    expect(statsDeVariante(g, 2)).toEqual({ pv: 20, armure: 4, initiative: 3 });
+    expect(statsDeVariante(g, 3)).toEqual({ pv: 26, armure: 6, initiative: 4 });
   });
 
   test('l’armure du garde monte avec la variante', () => {
@@ -221,15 +221,14 @@ suite('Initiative', ({ test }) => {
     expect(jet.ennemiCommence).toBe(false);
   });
 
-  test('le rat, rapide, ouvre le plus souvent contre un joueur à 2', () => {
-    const rng = createRng('init-rat');
-    let ennemiCommence = 0;
-    for (let i = 0; i < 4000; i++) {
-      if (Combat.jetDInitiative({ initiativeJoueur: 2, initiativeEnnemi: 6 }, rng).ennemiCommence) {
-        ennemiCommence++;
-      }
-    }
-    expect(ennemiCommence / 4000 > 0.55).toBe(true);
+  test('le rat reste le plus rapide du bestiaire', () => {
+    const inits = ENNEMIS.map((e) => e.variantes[0].initiative);
+    expect(ENNEMI_PAR_ID.rat_geant.variantes[0].initiative).toBe(Math.max(...inits));
+  });
+
+  test('l’initiative des premiers monstres reste modérée', () => {
+    // Un joueur à 2 ne doit pas être systématiquement devancé.
+    for (const e of ENNEMIS) expect(e.variantes[0].initiative <= 3).toBe(true);
   });
 
   test('le zombie, lent, ouvre rarement', () => {

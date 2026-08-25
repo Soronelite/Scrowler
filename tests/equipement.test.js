@@ -345,10 +345,10 @@ suite('Catalogue', ({ test }) => {
     }
   });
 
-  test('la lame des serments rompus est mythique et frappe en 3d6', () => {
+  test('la lame des serments rompus est mythique et frappe en 4d6', () => {
     const def = objet('lame_serments_rompus');
     expect(def.rarete).toBe('mythique');
-    expect(def.action.des).toBe('3d6');
+    expect(def.action.des).toBe('4d6');
     expect(def.mains).toBe(2);
   });
 

@@ -14,6 +14,7 @@ import { creerProgression } from './progression.js';
 import * as Portage from './portage.js';
 import * as Inv from './inventaire.js';
 import { instancier } from './equipement.js';
+import { creerTraits, bonusDeTraits, traitsActifs } from './traits.js';
 
 export function creerPersonnage({ nom, race, sexe, classe, stats }) {
   const modele = CLASSE_PAR_ID[classe];
@@ -27,6 +28,7 @@ export function creerPersonnage({ nom, race, sexe, classe, stats }) {
     stats: { ...statsParDefaut(), ...stats },
     portage: Portage.creerPortage(),
     progression: creerProgression(),
+    traits: creerTraits(),
   };
 
   equiperLeDepart(perso, modele);
@@ -61,6 +63,24 @@ function equiperLeDepart(perso, modele) {
 
 /* ------------------------------------------------------------------ */
 
+/**
+ * Statistiques effectives : les points répartis par le joueur, plus la couche
+ * de bonus apportée par les traits. `perso.stats` reste la base pure.
+ */
+export function statsEffectives(perso) {
+  const bonus = bonusDeTraits(perso).stats;
+  const sortie = { ...perso.stats };
+  for (const [id, valeur] of Object.entries(bonus)) {
+    sortie[id] = (sortie[id] ?? 0) + valeur;
+  }
+  return sortie;
+}
+
+/** Traits actifs, pour l'affichage. */
+export function traitsDe(perso) {
+  return traitsActifs(perso);
+}
+
 /** Raccourci de lecture : la grille du sac. */
 export function sacDe(perso) {
   return perso.portage.sac;
@@ -68,24 +88,37 @@ export function sacDe(perso) {
 
 /** PV maximum : statistiques + passifs des objets équipés. */
 export function pvMaxTotal(perso) {
-  return pvMax(perso.stats) + Portage.passif(perso.portage, 'pvMax');
+  return (
+    pvMax(statsEffectives(perso)) +
+    Portage.passif(perso.portage, 'pvMax') +
+    bonusDeTraits(perso).pvMax
+  );
 }
 
 /** Armure totale : statistiques + objets équipés + effets temporaires. */
 export function armureTotale(perso, effets = []) {
   const temporaire = effets.reduce((t, e) => t + (e.armure ?? 0), 0);
-  return armureDeBase(perso.stats) + Portage.passif(perso.portage, 'armure') + temporaire;
+  return (
+    armureDeBase(statsEffectives(perso)) +
+    Portage.passif(perso.portage, 'armure') +
+    bonusDeTraits(perso).armure +
+    temporaire
+  );
 }
 
 /** Initiative : statistique + passifs équipés. */
 export function initiativeTotale(perso) {
-  return perso.stats.initiative + Portage.passif(perso.portage, 'initiative');
+  return (
+    statsEffectives(perso).initiative +
+    Portage.passif(perso.portage, 'initiative') +
+    bonusDeTraits(perso).initiative
+  );
 }
 
 /** Actions par tour : statistiques + effets temporaires. */
 export function actionsDisponibles(perso, effets = []) {
   const bonus = effets.reduce((t, e) => t + (e.actions ?? 0), 0);
-  return actionsParTour(perso.stats) + bonus;
+  return actionsParTour(statsEffectives(perso)) + bonus;
 }
 
 export function soigner(perso, pv) {

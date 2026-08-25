@@ -24,7 +24,9 @@ import * as Effets from '../src/systems/effets.js';
 import * as Inv from '../src/systems/inventaire.js';
 import * as Portage from '../src/systems/portage.js';
 import * as Run from '../src/systems/run.js';
-import { creerPersonnage, actionsDisponibles, armureTotale } from '../src/systems/personnage.js';
+import {
+  creerPersonnage, actionsDisponibles, armureTotale, pvMaxTotal,
+} from '../src/systems/personnage.js';
 import { objet } from '../src/data/objets.js';
 
 const heros = (stats = {}) =>
@@ -211,9 +213,11 @@ suite('Jeter un objet', ({ test }) => {
     const run = Run.creerRun(p, { graine: 'anneau' });
     const slot = Inv.ajouter(p.portage.sac, 'anneau_vigueur');
     Portage.equiper(p.portage, slot.uid, 'bijou1');
-    p.pv = 12;
+    const maxAvecAnneau = pvMaxTotal(p);
+    p.pv = maxAvecAnneau;
     Run.jeterObjet(run, slot.uid);
-    expect(p.pv).toBe(10);
+    // Sans l'anneau, le maximum baisse de 2 : les PV doivent suivre.
+    expect(p.pv).toBe(maxAvecAnneau - 2);
   });
 
   test('un identifiant inconnu ne casse rien', () => {

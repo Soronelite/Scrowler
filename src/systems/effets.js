@@ -107,8 +107,32 @@ export function passifCumule(portage, champ) {
  * Les modificateurs du joueur portent le tag « joueur », ce qui les empêche
  * de s'appliquer aux attaques ennemies.
  */
-export function construirePipeline(portage, effets) {
+export function construirePipeline(portage, effets, traits = null) {
   const pipeline = new ModifierPipeline();
+
+  // Traits : bonus permanents, avant les passifs d'objets et les effets.
+  if (traits) {
+    if (traits.degats) {
+      pipeline.add({
+        id: 'trait-degats',
+        label: 'Traits',
+        source: 'traits',
+        phase: PHASES.FLAT,
+        requires: ['degats', 'joueur'],
+        apply: (v) => v + traits.degats,
+      });
+    }
+    if (traits.bonusJet) {
+      pipeline.add({
+        id: 'trait-bonus-jet',
+        label: 'Traits',
+        source: 'traits',
+        phase: PHASES.FLAT,
+        requires: ['joueur'],
+        apply: (v) => v + traits.bonusJet,
+      });
+    }
+  }
 
   const bonusJet = passifCumule(portage, 'bonusJet');
   if (bonusJet !== 0) {

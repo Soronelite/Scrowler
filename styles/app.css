@@ -668,3 +668,35 @@ button.danger:hover:not(:disabled) {
   /* Les gravures sont sur fond noir : on les fond dans le décor. */
   background: #000;
 }
+
+/* ---------------- traits ---------------- */
+
+.traits { display: flex; flex-direction: column; gap: 0.15rem; }
+
+.trait {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.45rem 0;
+}
+.trait + .trait { border-top: 1px solid var(--ink-800); }
+.trait-nom { font-weight: 500; }
+.trait.positif .trait-nom { color: var(--gain); }
+.trait.negatif .trait-nom { color: var(--loss); }
+.trait-desc { color: var(--bone-dim); font-size: 0.84rem; }
+.trait-origine {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--bone-dim);
+  border: 1px solid var(--ink-700);
+  border-radius: 2px;
+  padding: 0.1rem 0.35rem;
+}
+
+@media (max-width: 30rem) {
+  .trait { grid-template-columns: 1fr auto; }
+  .trait-desc { grid-column: 1 / -1; }
+}

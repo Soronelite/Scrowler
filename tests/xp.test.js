@@ -225,9 +225,9 @@ suite('Effets temporaires', ({ test }) => {
 
   test('l’anneau de vigueur augmente les PV maximum', () => {
     const p = perso();
-    expect(pvMaxTotal(p)).toBe(10);
+    const avant = pvMaxTotal(p);
     Portage.equiper(p.portage, Inv.ajouter(p.portage.sac, 'anneau_vigueur').uid, 'bijou1');
-    expect(pvMaxTotal(p)).toBe(12);
+    expect(pvMaxTotal(p)).toBe(avant + 2);
   });
 });
 
@@ -269,6 +269,11 @@ suite('Run complète avec XP', ({ test }) => {
     const run = Run.creerRun(p, { graine });
     let garde = 0;
     while (run.phase !== Run.PHASES.FIN && garde++ < 500) {
+      // Le joueur survit désormais à des étages entiers : il faut descendre.
+      if (run.phase === Run.PHASES.FIN_ETAGE) {
+        Run.descendre(run);
+        continue;
+      }
       if (Run.attendUnChoixDeCompetence(run)) {
         Run.attribuerPoint(run, ciblesDisponibles(p)[0].id);
         continue;

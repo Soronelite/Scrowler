@@ -5,7 +5,7 @@
  *   - 8 statistiques, maximum 12 ;
  *   - 2 points par défaut, sauf Endurance qui démarre à 0 ;
  *   - 2 points supplémentaires à répartir à la création ;
- *   - 10 PV et 0 armure au départ ;
+ *   - 12 PV et 0 armure au départ ;
  *   - 1 point de Santé   = +2 PV maximum ;
  *   - 1 point de Défense = +1 armure ;
  *   - Endurance : une action par tranche de 3 points, plus une de base
@@ -37,7 +37,7 @@ export function minimumDe(statId) {
   return STATS.find((s) => s.id === statId)?.min ?? STAT_MIN;
 }
 
-export const PV_BASE = 10;
+export const PV_BASE = 12;
 export const ARMURE_BASE = 0;
 export const PV_PAR_SANTE = 2;
 export const ARMURE_PAR_DEFENSE = 1;

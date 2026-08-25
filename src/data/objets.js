@@ -28,7 +28,7 @@ export const OBJETS = [
     mains: 2,
     forme: { l: 1, h: 4 },
     usure: { max: 50, reparable: true },
-    action: { type: 'attaque', verbe: 'Attaquer', des: '2d6', cout: 1 },
+    action: { type: 'attaque', verbe: 'Attaquer', des: '3d6', cout: 1 },
   },
   {
     id: 'epee_courte',
@@ -40,7 +40,7 @@ export const OBJETS = [
     mains: 1,
     forme: { l: 1, h: 2 },
     usure: { max: 40, reparable: true },
-    action: { type: 'attaque', verbe: 'Attaquer', des: '1d6', cout: 1 },
+    action: { type: 'attaque', verbe: 'Attaquer', des: '2d6', cout: 1 },
   },
   {
     id: 'dague',
@@ -67,7 +67,7 @@ export const OBJETS = [
     // à enchaîner les combats plutôt qu'à les éviter.
     usure: { max: 25, reparable: false },
     rechargeParVictoire: 5,
-    action: { type: 'attaque', verbe: 'Trancher', des: '3d6', cout: 1 },
+    action: { type: 'attaque', verbe: 'Trancher', des: '4d6', cout: 1 },
   },
 
   /* ---------------- protections ---------------- */

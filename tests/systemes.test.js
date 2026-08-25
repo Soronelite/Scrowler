@@ -117,15 +117,15 @@ suite('Personnage', ({ test }) => {
     expect(statsParDefaut().sante).toBe(2);
   });
 
-  test('les statistiques par défaut donnent 10 PV et 0 armure', () => {
+  test('les statistiques par défaut donnent 12 PV et 0 armure', () => {
     const s = statsParDefaut();
-    expect(pvMax(s)).toBe(10);
+    expect(pvMax(s)).toBe(12);
     expect(armureDeBase(s)).toBe(0);
   });
 
   test('un point de santé donne 2 PV, un point de défense donne 1 armure', () => {
     const s = { ...statsParDefaut(), sante: 4, defense: 3 };
-    expect(pvMax(s)).toBe(14);
+    expect(pvMax(s)).toBe(16);
     expect(armureDeBase(s)).toBe(1);
   });
 
@@ -143,7 +143,8 @@ suite('Personnage', ({ test }) => {
     expect(p.portage.equipement.mainGauche.objetId).toBe('bouclier_bois');
     expect(p.portage.equipement.dos.objetId).toBe('sac_a_dos');
     expect(p.portage.raccourcis[0].contenu.objetId).toBe('pain_rassis');
-    expect(p.pv).toBe(10);
+    // 12 de base, +2 PV via le trait de race humaine (+2 Santé).
+    expect(p.pv).toBe(16);
   });
 
   test('l’armure des objets équipés s’ajoute à celle des statistiques', () => {
@@ -152,8 +153,9 @@ suite('Personnage', ({ test }) => {
       stats: { ...statsParDefaut(), defense: 4 },
     });
     Portage.equiper(p.portage, Inv.ajouter(p.portage.sac, 'casque_fer').uid, 'tete');
-    // 2 de Défense au-dessus du minimum, +2 bouclier, +1 casque.
-    expect(armureTotale(p)).toBe(2 + 2 + 1);
+    // 2 de Défense au-dessus du minimum, +2 bouclier, +1 casque,
+    // +1 via le trait de classe du chevalier.
+    expect(armureTotale(p)).toBe(2 + 2 + 1 + 1);
   });
 
   test('les soins ne dépassent pas le maximum', () => {
@@ -161,9 +163,10 @@ suite('Personnage', ({ test }) => {
       nom: 'Test', race: 'humain', sexe: 'homme', classe: 'chevalier',
       stats: statsParDefaut(),
     });
+    const max = p.pv;
     blesser(p, 3);
     expect(soigner(p, 10)).toBe(3);
-    expect(p.pv).toBe(10);
+    expect(p.pv).toBe(max);
   });
 });
 

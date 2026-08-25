@@ -30,6 +30,7 @@ import {
 } from './personnage.js';
 import * as Inv from './inventaire.js';
 import * as Portage from './portage.js';
+import { bonusDeTraits } from './traits.js';
 import * as Eq from './equipement.js';
 import * as Combat from './combat.js';
 import * as Effets from './effets.js';
@@ -105,7 +106,8 @@ export function progression(run) {
 }
 
 /** Pipeline reconstruit à chaque jet, à partir de l'inventaire et des effets. */
-const pipelineDe = (run) => Effets.construirePipeline(run.personnage.portage, run.effets);
+const pipelineDe = (run) =>
+  Effets.construirePipeline(run.personnage.portage, run.effets, bonusDeTraits(run.personnage));
 
 /* ------------------------------------------------------------------ */
 /* Expérience                                                          */

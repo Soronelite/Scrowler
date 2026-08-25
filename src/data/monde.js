@@ -27,10 +27,12 @@ export const ENNEMIS = [
     familles: ['vermine'],
     rang: 1,
     etageMini: 1,
+    // Initiative revue à la baisse : à 6, le rat ouvrait 72 % des combats
+    // contre un joueur à 2, ce qui rendait la statistique du joueur inutile.
     variantes: [
-      { pv: 10, armure: 0, initiative: 6 },
-      { pv: 14, armure: 0, initiative: 7 },
-      { pv: 18, armure: 1, initiative: 8 },
+      { pv: 10, armure: 0, initiative: 3 },
+      { pv: 14, armure: 0, initiative: 4 },
+      { pv: 18, armure: 1, initiative: 5 },
     ],
     attaques: [
       {
@@ -57,9 +59,9 @@ export const ENNEMIS = [
     rang: 2,
     etageMini: 2,
     variantes: [
-      { pv: 12, armure: 2, initiative: 4 },
-      { pv: 16, armure: 3, initiative: 5 },
-      { pv: 21, armure: 3, initiative: 5 },
+      { pv: 12, armure: 2, initiative: 2 },
+      { pv: 16, armure: 3, initiative: 3 },
+      { pv: 21, armure: 3, initiative: 3 },
     ],
     attaques: [
       {
@@ -111,9 +113,9 @@ export const ENNEMIS = [
     // Armure allégée sur les deux premières variantes : à 4, une épée courte
     // (1d6) ne passait quasiment jamais et le combat était insoluble.
     variantes: [
-      { pv: 15, armure: 2, initiative: 3 },
-      { pv: 20, armure: 4, initiative: 4 },
-      { pv: 26, armure: 6, initiative: 5 },
+      { pv: 15, armure: 2, initiative: 2 },
+      { pv: 20, armure: 4, initiative: 3 },
+      { pv: 26, armure: 6, initiative: 4 },
     ],
     attaques: [
       {
