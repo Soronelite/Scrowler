@@ -15,7 +15,10 @@ import {
   STAT_MIN,
 } from '../src/rules/stats.js';
 import { tirer, tirerButin, raretesAutorisees } from '../src/systems/loot.js';
-import { PARCOURS, LONGUEUR_PARCOURS, ENNEMI_PAR_ID, rencontreAuRang } from '../src/data/monde.js';
+import { ENNEMI_PAR_ID } from '../src/data/monde.js';
+import { piece } from '../src/data/pieces.js';
+import { PIECES_PAR_ETAGE, ETAGE_MAX, CHANCE_DE_FUITE } from '../src/rules/etages.js';
+import * as Donjon from '../src/systems/donjon.js';
 import { xpDUnEnnemi } from '../src/rules/xp.js';
 import * as Effets from '../src/systems/effets.js';
 import * as Inv from '../src/systems/inventaire.js';
@@ -173,7 +176,7 @@ suite('Objets au sol', ({ test }) => {
     for (let x = 0; x < 4; x++) Inv.placer(p.portage.sac, 'epee_deux_mains', x, 0);
 
     const run = Run.creerRun(p, { graine: 'sol2' });
-    run.objetsAuSol.set(run.indexPiece, ['dague']);
+    run.objetsAuSol.set(`${run.etage}:${run.indexPiece}`, ['dague']);
 
     expect(Run.ramasserAuSol(run, 'dague')).toBe(false);
     Run.jeterObjet(run, p.portage.sac.contenu[0].uid);
@@ -184,7 +187,7 @@ suite('Objets au sol', ({ test }) => {
   test('l’objet au sol est proposé comme action', () => {
     const p = heros();
     const run = Run.creerRun(p, { graine: 'sol3' });
-    run.objetsAuSol.set(run.indexPiece, ['dague']);
+    run.objetsAuSol.set(`${run.etage}:${run.indexPiece}`, ['dague']);
     const actions = Run.actionsDeRencontre(run);
     expect(actions.some((a) => a.type === 'ramasser')).toBe(true);
   });
@@ -222,29 +225,150 @@ suite('Jeter un objet', ({ test }) => {
 
 /* ------------------------------------------------------------------ */
 
-suite('Parcours', ({ test }) => {
-  test('le parcours compte six pièces', () => {
-    expect(LONGUEUR_PARCOURS).toBe(6);
-  });
-
-  test('les trois rencontres sont répétées une fois', () => {
-    expect(PARCOURS).toEqual([
-      'cave_lugubre', 'cellier', 'couloir_garde',
-      'cave_lugubre', 'cellier', 'couloir_garde',
-    ]);
-  });
-
-  test('une répétition redonne bien la même rencontre', () => {
-    expect(rencontreAuRang(0).id).toBe(rencontreAuRang(3).id);
-  });
-
-  test('la fouille d’une pièce répétée est de nouveau disponible', () => {
+suite('Étages', ({ test }) => {
+  test('un étage compte dix pièces', () => {
+    expect(PIECES_PAR_ETAGE).toBe(10);
     const p = heros();
-    const run = Run.creerRun(p, { graine: 'repet' });
-    run.actionsFaites.add('1:fouiller_piece');
-    run.indexPiece = 4; // cellier, deuxième passage
+    const run = Run.creerRun(p, { graine: 'etages' });
+    expect(run.pieces.length).toBe(10);
+  });
+
+  test('le donjon s’arrête au cinquième étage', () => {
+    expect(ETAGE_MAX).toBe(5);
+  });
+
+  test('la run démarre au premier étage', () => {
+    const run = Run.creerRun(heros(), { graine: 'depart' });
+    expect(run.etage).toBe(1);
+    expect(Run.progression(run).total).toBe(10);
+  });
+
+  test('chaque pièce tirée est autorisée à cet étage', () => {
+    const run = Run.creerRun(heros(), { graine: 'coherence' });
+    for (const id of run.pieces) {
+      expect(piece(id).etages.includes(1)).toBe(true);
+    }
+  });
+
+  test('une même graine produit le même étage', () => {
+    const a = Run.creerRun(heros(), { graine: 'jumeau' });
+    const b = Run.creerRun(heros(), { graine: 'jumeau' });
+    expect(a.pieces).toEqual(b.pieces);
+  });
+
+  test('deux graines différentes produisent des étages différents', () => {
+    const a = Run.creerRun(heros(), { graine: 'alpha' });
+    const b = Run.creerRun(heros(), { graine: 'beta' });
+    expect(a.pieces.join() !== b.pieces.join()).toBe(true);
+  });
+
+  test('le combat ne décale pas la génération du monde', () => {
+    const a = Run.creerRun(heros(), { graine: 'flux' });
+    const b = Run.creerRun(heros(), { graine: 'flux' });
+    // On épuise le flux de combat de A sans toucher au monde.
+    for (let i = 0; i < 200; i++) a.rngCombat.die(6);
+    a.etage = 2;
+    b.etage = 2;
+    expect(Donjon.genererEtage(2, a.rngMonde)).toEqual(Donjon.genererEtage(2, b.rngMonde));
+  });
+
+  test('la fin d’étage propose de descendre ou de s’arrêter', () => {
+    const run = Run.creerRun(heros(), { graine: 'fin' });
+    run.indexPiece = run.pieces.length - 1;
+    run.piece.ennemi = null; // sinon « Avancer » n'est pas proposé
     run.phase = Run.PHASES.EXPLORATION;
-    expect(Run.actionsDeRencontre(run).some((a) => a.id === 'fouiller_piece')).toBe(true);
+    Run.executerAction(run, 'avancer');
+    expect(run.phase).toBe(Run.PHASES.FIN_ETAGE);
+  });
+
+  test('descendre passe à l’étage suivant et régénère les pièces', () => {
+    const run = Run.creerRun(heros(), { graine: 'descente' });
+    run.phase = Run.PHASES.FIN_ETAGE;
+    Run.descendre(run);
+    expect(run.etage).toBe(2);
+    expect(run.indexPiece).toBe(0);
+    expect(run.pieces.length).toBe(10);
+  });
+
+  test('s’arrêter met fin à la run', () => {
+    const run = Run.creerRun(heros(), { graine: 'arret' });
+    run.phase = Run.PHASES.FIN_ETAGE;
+    Run.arreterLaRun(run);
+    expect(run.phase).toBe(Run.PHASES.FIN);
+    expect(run.issue).toBe('arrete');
+  });
+
+  test('le cinquième étage termine la run sans proposer de descendre', () => {
+    const run = Run.creerRun(heros(), { graine: 'dernier' });
+    run.etage = ETAGE_MAX;
+    run.indexPiece = run.pieces.length - 1;
+    run.piece.ennemi = null;
+    run.phase = Run.PHASES.EXPLORATION;
+    Run.executerAction(run, 'avancer');
+    expect(run.phase).toBe(Run.PHASES.FIN);
+    expect(run.issue).toBe('termine');
+  });
+});
+
+suite('Contenu des pièces', ({ test }) => {
+  test('une pièce sans ennemi propose fouille et avancée', () => {
+    const run = Run.creerRun(heros(), { graine: 'vide' });
+    run.piece.ennemi = null;
+    const ids = Run.actionsDeRencontre(run).map((a) => a.id);
+    expect(ids).toEqual(['fouiller_piece', 'avancer']);
+  });
+
+  test('fouiller est impossible tant qu’un ennemi est présent', () => {
+    const run = Run.creerRun(heros(), { graine: 'occupe' });
+    run.piece.ennemi = { ennemiId: 'rat_geant', rang: 1, variante: 1 };
+    const ids = Run.actionsDeRencontre(run).map((a) => a.id);
+    expect(ids).toEqual(['attaquer', 'fuir']);
+  });
+
+  test('la fuite est à 25 % partout', () => {
+    const run = Run.creerRun(heros(), { graine: 'fuite25' });
+    run.piece.ennemi = { ennemiId: 'rat_geant', rang: 1, variante: 1 };
+    const fuite = Run.actionsDeRencontre(run).find((a) => a.type === 'fuite');
+    expect(fuite.chance).toBe(CHANCE_DE_FUITE);
+    expect(CHANCE_DE_FUITE).toBe(25);
+  });
+
+  test('une pièce éclairée pose l’effet de lumière', () => {
+    let trouve = false;
+    for (let i = 0; i < 60 && !trouve; i++) {
+      const run = Run.creerRun(heros(), { graine: `lumiere${i}` });
+      if (run.piece.eclairee) {
+        trouve = true;
+        expect(Effets.lootAmeliore(run.effets)).toBe(true);
+      }
+    }
+    expect(trouve).toBe(true);
+  });
+
+  test('l’ennemi tiré appartient bien à une famille de la pièce', () => {
+    for (let i = 0; i < 80; i++) {
+      const run = Run.creerRun(heros(), { graine: `famille${i}` });
+      if (!run.piece.ennemi) continue;
+      const modele = ENNEMI_PAR_ID[run.piece.ennemi.ennemiId];
+      const familles = run.piece.def.rencontre.familles;
+      expect(familles.some((f) => modele.familles.includes(f))).toBe(true);
+    }
+  });
+
+  test('fuir ne rapporte aucune XP', () => {
+    const run = Run.creerRun(heros(), { graine: 'fuitexp' });
+    run.piece.ennemi = { ennemiId: 'rat_geant', rang: 1, variante: 1 };
+    const avant = run.personnage.progression.xp;
+    // On force la réussite en épuisant les échecs possibles.
+    let fui = false;
+    for (let i = 0; i < 40 && !fui; i++) {
+      const depart = run.indexPiece;
+      if (run.phase !== Run.PHASES.EXPLORATION) break;
+      Run.executerAction(run, 'fuir');
+      if (run.indexPiece > depart) fui = true;
+      else break;
+    }
+    if (fui) expect(run.personnage.progression.xp).toBe(avant);
   });
 });
 

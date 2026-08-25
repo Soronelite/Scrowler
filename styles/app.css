@@ -569,3 +569,14 @@ button.danger:hover:not(:disabled) {
   gap: 0.4rem;
 }
 .rapide.potion { border-style: dashed; }
+
+.zone-texte .etage {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--brass);
+  border-top: 1px solid var(--ink-700);
+  padding-top: 0.7rem;
+  margin-top: 0.9rem;
+}

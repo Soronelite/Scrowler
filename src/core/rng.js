@@ -104,6 +104,18 @@ export function createRng(seed = Date.now() ^ (Math.random() * 0xffffffff)) {
       return { seed: initialSeed, state: state >>> 0, calls };
     },
 
+    /**
+     * Dérive un générateur indépendant à partir de la même graine.
+     *
+     * Indispensable pour les runs reproductibles : si la génération du donjon
+     * et les jets de combat puisaient dans le même flux, le nombre de dés
+     * lancés pendant un combat décalerait tout le reste de l'étage. Deux
+     * parties de même graine divergeraient dès que le joueur joue autrement.
+     */
+    deriver(etiquette) {
+      return createRng(`${initialSeed}:${etiquette}`);
+    },
+
     /** Restaure un état produit par save(). */
     load(snapshot) {
       if (!snapshot || typeof snapshot.state !== 'number') {

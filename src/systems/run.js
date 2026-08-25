@@ -6,11 +6,20 @@
  */
 
 import { createRng } from '../core/rng.js';
-import { rencontreAuRang, LONGUEUR_PARCOURS, ENNEMI_PAR_ID } from '../data/monde.js';
+import { ENNEMI_PAR_ID } from '../data/monde.js';
+import * as Donjon from './donjon.js';
+import {
+  PIECES_PAR_ETAGE,
+  ETAGE_DEPART,
+  ETAGE_MAX,
+  CHANCE_DE_FUITE,
+  estDernierEtage,
+} from '../rules/etages.js';
 import { objet, OBJET_PAR_ID } from '../data/objets.js';
 import { RARETE_PAR_ID } from '../data/personnage.js';
 import {
   armureTotale,
+  initiativeTotale,
   actionsDisponibles,
   pvMaxTotal,
   recaler,
@@ -33,48 +42,67 @@ export const PHASES = {
   EXPLORATION: 'exploration',
   COMBAT: 'combat',
   APRES_COMBAT: 'apres_combat',
+  /** Fin d'étage : continuer plus bas, ou s'arrêter là. */
+  FIN_ETAGE: 'fin_etage',
   FIN: 'fin',
 };
 
 export function creerRun(personnage, { graine = Date.now() } = {}) {
+  const rng = createRng(graine);
+
   const run = {
     personnage,
-    rng: createRng(graine),
     graine,
+    /**
+     * Deux flux distincts. Le monde ne doit jamais dépendre du nombre de dés
+     * lancés en combat, sinon une même graine ne produirait plus le même étage.
+     */
+    rngMonde: rng.deriver('monde'),
+    rngCombat: rng.deriver('combat'),
     effets: Effets.creerListeEffets(),
+    etage: ETAGE_DEPART,
+    pieces: [],
     indexPiece: 0,
+    piece: null,
     phase: PHASES.EXPLORATION,
     combat: null,
-    actionsFaites: new Set(),
     transitionsRecompensees: new Set(),
-    /** Objets trouvés mais non ramassés, par rang de parcours. */
+    /** Objets trouvés mais non ramassés, par clé étage:pièce. */
     objetsAuSol: new Map(),
     journal: [],
     issue: null,
     onChangement: null,
   };
 
-  entrerDansLaPiece(run);
+  // `rng` reste exposé pour le combat : tout le code de jets l'utilise.
+  Object.defineProperty(run, 'rng', { get: () => run.rngCombat });
+
+  entrerDansLEtage(run);
   return run;
 }
 
 /* ------------------------------------------------------------------ */
 
 function noter(run, texte, type = 'recit') {
-  run.journal.push({ texte, type, piece: run.indexPiece });
+  run.journal.push({ texte, type, piece: cleDePiece(run), etage: run.etage });
 }
+
+const cleDePiece = (run) => `${run.etage}:${run.indexPiece}`;
 
 const prevenir = (run) => run.onChangement?.(run);
 
 export function pieceCourante(run) {
-  return rencontreAuRang(run.indexPiece);
+  return run.piece;
 }
 
 export function progression(run) {
-  return { piece: run.indexPiece + 1, total: LONGUEUR_PARCOURS };
+  return {
+    piece: run.indexPiece + 1,
+    total: run.pieces.length,
+    etage: run.etage,
+    etageMax: ETAGE_MAX,
+  };
 }
-
-const cleAction = (run, id) => `${run.indexPiece}:${id}`;
 
 /** Pipeline reconstruit à chaque jet, à partir de l'inventaire et des effets. */
 const pipelineDe = (run) => Effets.construirePipeline(run.personnage.portage, run.effets);
@@ -140,28 +168,83 @@ export function attribuerPoint(run, cibleId) {
 /* Pièces                                                              */
 /* ------------------------------------------------------------------ */
 
+function entrerDansLEtage(run) {
+  run.pieces = Donjon.genererEtage(run.etage, run.rngMonde, PIECES_PAR_ETAGE);
+  run.indexPiece = 0;
+  noter(run, `ÉTAGE ${run.etage}`, 'etage');
+  entrerDansLaPiece(run);
+}
+
 function entrerDansLaPiece(run) {
-  const piece = pieceCourante(run);
-  if (!piece) return terminer(run, 'termine');
+  const pieceId = run.pieces[run.indexPiece];
+  if (!pieceId) return finirLEtage(run);
+
+  run.piece = Donjon.resoudrePiece(
+    pieceId,
+    { etage: run.etage, niveauJoueur: run.personnage.progression.niveau },
+    run.rngMonde
+  );
 
   run.phase = PHASES.EXPLORATION;
   run.combat = null;
-  noter(run, `— ${piece.lieu} —`, 'lieu');
-  noter(run, piece.description);
-  if (piece.apparition) noter(run, piece.apparition, 'alerte');
+
+  const { def, eclairee, ennemi } = run.piece;
+  noter(run, `— ${def.nom} —`, 'lieu');
+  noter(run, def.description);
+
+  if (eclairee) {
+    Effets.appliquer(
+      run.effets,
+      {
+        id: 'lumiere',
+        label: 'Torches allumées',
+        bonusLoot: { rareteSuperieure: 10, objetDouble: 25 },
+        dureePieces: 1,
+      },
+      'piece'
+    );
+    noter(run, 'Des torches brûlent encore : la pièce est éclairée.', 'effet');
+  }
+
+  if (ennemi) {
+    const modele = ENNEMI_PAR_ID[ennemi.ennemiId];
+    noter(run, `${modele.nom} se dresse devant toi.`, 'alerte');
+  }
 }
+
+function finirLEtage(run) {
+  if (estDernierEtage(run.etage)) return terminer(run, 'termine');
+  run.phase = PHASES.FIN_ETAGE;
+  run.combat = null;
+  noter(run, `Étage ${run.etage} terminé. Un escalier descend plus bas.`, 'etage');
+}
+
+/** Descend d'un étage. */
+export function descendre(run) {
+  if (run.phase !== PHASES.FIN_ETAGE) return;
+  run.etage++;
+  entrerDansLEtage(run);
+  prevenir(run);
+}
+
+/** Arrête la run volontairement, à la fin d'un étage. */
+export function arreterLaRun(run) {
+  if (run.phase !== PHASES.FIN_ETAGE) return;
+  terminer(run, 'arrete');
+  prevenir(run);
+}
+
+const FINS = {
+  mort: (run) => `${run.personnage.nom} s'effondre. La run s'arrête ici.`,
+  arrete: (run) => `${run.personnage.nom} remonte à la surface après l'étage ${run.etage}.`,
+  termine: () => `Le dernier étage est derrière toi.`,
+};
 
 function terminer(run, issue) {
   run.phase = PHASES.FIN;
   run.issue = issue;
   run.combat = null;
-  noter(
-    run,
-    issue === 'mort'
-      ? `${run.personnage.nom} s'effondre. La run s'arrête ici.`
-      : 'Les trois pièces sont derrière toi.',
-    issue === 'mort' ? 'alerte' : 'lieu'
-  );
+  noter(run, FINS[issue](run), issue === 'mort' ? 'alerte' : 'lieu');
 }
 
 /* ------------------------------------------------------------------ */
@@ -169,16 +252,8 @@ function terminer(run, issue) {
 /* ------------------------------------------------------------------ */
 
 export function actionsDeRencontre(run) {
-  const piece = pieceCourante(run);
-  if (!piece) return [];
-
-  let source = [];
-  if (run.phase === PHASES.EXPLORATION) source = piece.actions ?? [];
-  else if (run.phase === PHASES.APRES_COMBAT) source = piece.apresCombat ?? [];
-
-  const actions = source.filter(
-    (a) => !(a.uneFois && run.actionsFaites.has(cleAction(run, a.id)))
-  );
+  const etat = run.piece;
+  if (!etat) return [];
 
   // Les objets laissés au sol restent proposés tant qu'on est dans la pièce.
   const auSol = objetsAuSol(run).map((id) => ({
@@ -188,6 +263,42 @@ export function actionsDeRencontre(run) {
     objetId: id,
   }));
 
+  const actions = [];
+  const ennemiPresent = Boolean(etat.ennemi) && run.phase === PHASES.EXPLORATION;
+
+  if (ennemiPresent) {
+    // Fouiller est impossible tant qu'un ennemi occupe la pièce.
+    actions.push({ id: 'attaquer', libelle: 'Attaquer', type: 'combat' });
+    actions.push({
+      id: 'fuir',
+      libelle: `Fuir (${CHANCE_DE_FUITE} %)`,
+      type: 'fuite',
+      chance: CHANCE_DE_FUITE,
+    });
+    return [...auSol, ...actions];
+  }
+
+  if (run.phase === PHASES.APRES_COMBAT && !etat.fouilles.has('cadavre')) {
+    actions.push({
+      id: 'fouiller_cadavre',
+      libelle: 'Fouiller le cadavre',
+      type: 'loot',
+      table: 'frequent_seul',
+      marque: 'cadavre',
+    });
+  }
+
+  if (!etat.fouilles.has('piece')) {
+    actions.push({
+      id: 'fouiller_piece',
+      libelle: 'Fouiller la pièce',
+      type: 'loot',
+      table: etat.def.fouille?.table ?? 'jusqu_commun',
+      marque: 'piece',
+    });
+  }
+
+  actions.push({ id: 'avancer', libelle: 'Avancer', type: 'avancer' });
   return [...auSol, ...actions];
 }
 
@@ -208,9 +319,33 @@ export function executerAction(run, actionId) {
   prevenir(run);
 }
 
-function engagerCombat(run, ennemiCommence) {
-  const piece = pieceCourante(run);
-  run.combat = Combat.creerCombat(piece.ennemi, { ennemiCommence });
+function engagerCombat(run, ennemiImpose = false) {
+  const rencontre = run.piece.ennemi;
+  const provisoire = Combat.creerCombat(rencontre.ennemiId, {
+    variante: rencontre.variante,
+  });
+
+  // Une fuite ratée donne l'initiative à l'ennemi, sans jet.
+  let ennemiCommence = ennemiImpose;
+  if (!ennemiImpose) {
+    const jet = Combat.jetDInitiative(
+      {
+        initiativeJoueur: initiativeTotale(run.personnage),
+        initiativeEnnemi: provisoire.ennemi.initiative,
+      },
+      run.rngCombat
+    );
+    ennemiCommence = jet.ennemiCommence;
+    noter(
+      run,
+      `Initiative — toi ${jet.detailJoueur} = ${jet.scoreJoueur}, ` +
+      `${provisoire.ennemi.nom} ${jet.detailEnnemi} = ${jet.scoreEnnemi}.`,
+      'jet'
+    );
+  }
+
+  run.combat = provisoire;
+  run.combat.aQui = ennemiCommence ? 'ennemi' : 'joueur';
   run.phase = PHASES.COMBAT;
 
   if (ennemiCommence) {
@@ -223,26 +358,27 @@ function engagerCombat(run, ennemiCommence) {
 }
 
 function fuir(run, action) {
-  const reussi = Combat.tenterFuite(action.chance, run.rng);
+  const reussi = Combat.tenterFuite(action.chance, run.rngCombat);
   noter(run, `Tentative de fuite (${action.chance} %) : ${reussi ? 'réussie' : 'échouée'}.`, 'jet');
 
   if (reussi) {
-    noter(run, action.reussite);
-    avancer(run);
+    noter(run, 'Tu quittes la pièce sans demander ton reste.');
+    // Fuir ne rapporte aucune XP de progression.
+    avancer(run, { xp: false });
   } else {
-    noter(run, action.echec, 'alerte');
-    engagerCombat(run, action.ennemiCommenceSiEchec === true);
+    noter(run, "L'ennemi te coupe la route et frappe le premier.", 'alerte');
+    engagerCombat(run, true);
   }
 }
 
 function objetsAuSol(run) {
-  return run.objetsAuSol.get(run.indexPiece) ?? [];
+  return run.objetsAuSol.get(cleDePiece(run)) ?? [];
 }
 
 function poserAuSol(run, objetDef) {
-  const liste = run.objetsAuSol.get(run.indexPiece) ?? [];
+  const liste = run.objetsAuSol.get(cleDePiece(run)) ?? [];
   liste.push(objetDef.id);
-  run.objetsAuSol.set(run.indexPiece, liste);
+  run.objetsAuSol.set(cleDePiece(run), liste);
 }
 
 /** Tente de ranger un objet. Sinon il reste au sol, récupérable plus tard. */
@@ -265,7 +401,7 @@ function recupererOuLaisser(run, objetDef) {
 }
 
 function fouiller(run, action) {
-  run.actionsFaites.add(cleAction(run, action.id));
+  run.piece.fouilles.add(action.marque);
 
   const ameliore = Effets.lootAmeliore(run.effets);
   const butin = tirerButin(action.table, run.rng, { lootAmeliore: ameliore });
@@ -284,7 +420,7 @@ function fouiller(run, action) {
 
 /** Ramasse un objet laissé au sol dans la pièce courante. */
 export function ramasserAuSol(run, objetId) {
-  const liste = run.objetsAuSol.get(run.indexPiece) ?? [];
+  const liste = run.objetsAuSol.get(cleDePiece(run)) ?? [];
   const index = liste.indexOf(objetId);
   if (index === -1) return false;
 
@@ -297,7 +433,7 @@ export function ramasserAuSol(run, objetId) {
   }
 
   liste.splice(index, 1);
-  if (liste.length === 0) run.objetsAuSol.delete(run.indexPiece);
+  if (liste.length === 0) run.objetsAuSol.delete(cleDePiece(run));
   noter(run, `Tu ramasses ${objetDef.nom}.`, 'butin');
   prevenir(run);
   return true;
@@ -370,14 +506,15 @@ function rechargerSurVictoire(run) {
   }
 }
 
-function avancer(run) {
+function avancer(run, { xp = true } = {}) {
   const suivante = run.indexPiece + 1;
+  const cle = `${run.etage}:${suivante}`;
 
-  // XP de progression : une seule fois par passage vers une pièce donnée,
-  // même si un retour en arrière est ajouté plus tard.
-  if (!run.transitionsRecompensees.has(suivante)) {
-    run.transitionsRecompensees.add(suivante);
-    donnerXp(run, Prog.XP_PROGRESSION, 'progression');
+  // XP de progression : une seule fois par passage vers une pièce donnée.
+  // Une fuite ne rapporte rien, mais consomme quand même la transition.
+  if (!run.transitionsRecompensees.has(cle)) {
+    run.transitionsRecompensees.add(cle);
+    if (xp) donnerXp(run, Prog.XP_PROGRESSION, 'progression');
   }
 
   for (const expire of Effets.changementDePiece(run.effets)) {
@@ -385,7 +522,7 @@ function avancer(run) {
   }
 
   run.indexPiece = suivante;
-  if (run.indexPiece >= LONGUEUR_PARCOURS) terminer(run, 'termine');
+  if (run.indexPiece >= run.pieces.length) finirLEtage(run);
   else entrerDansLaPiece(run);
 }
 
@@ -544,20 +681,48 @@ function frapper(run, source, des) {
 
     rechargerSurVictoire(run);
     Effets.finDeCombat(run.effets);
+    Effets.finDeCombat(run.combat.effets);
   }
 }
 
 function riposteEnnemi(run) {
-  const r = Combat.riposte(run.combat, {
-    rng: run.rng,
+  const combat = run.combat;
+
+  // Les effets de l'ennemi vieillissent au début de son tour.
+  for (const expire of Effets.finDeTour(combat.effets)) {
+    noter(run, `${expire.label} de ${combat.ennemi.nom} se dissipe.`, 'effet');
+  }
+
+  const etat = Combat.etatDuCombat(combat, run.personnage, pvMaxTotal(run.personnage));
+  const attaque = Combat.choisirAttaque(combat, etat, run.rngCombat);
+
+  if (!attaque) return;
+
+  // Une attaque de type effet ou soin REMPLACE l'attaque du tour.
+  if (attaque.type === 'effet') {
+    Effets.appliquer(combat.effets, attaque.effet, `ennemi:${combat.ennemi.id}`);
+    noter(run, `${combat.ennemi.nom} utilise ${attaque.nom}.`, 'effet');
+    return;
+  }
+
+  if (attaque.type === 'soin') {
+    const r = Combat.soinEnnemi(combat, attaque, { rng: run.rngCombat });
+    noter(run, `${combat.ennemi.nom} utilise ${attaque.nom} : ${r.jet.describe()}`, 'jet');
+    noter(run, `${combat.ennemi.nom} récupère ${r.rendus} PV (${combat.ennemi.pv}/${combat.ennemi.pvMax}).`, 'soin');
+    return;
+  }
+
+  const r = Combat.attaqueEnnemie(combat, attaque, {
+    rng: run.rngCombat,
     pipeline: pipelineDe(run),
     personnage: run.personnage,
     armureJoueur: armureTotale(run.personnage, run.effets),
   });
 
-  const detail = r.absorbe > 0 ? ` (${r.brut} − ${r.absorbe} d'armure)` : '';
-  noter(run, `${run.combat.ennemi.nom} attaque : ${r.jet.describe()}`, 'jet');
+  const bonus = r.bonus > 0 ? ` +${r.bonus}` : '';
+  noter(run, `${combat.ennemi.nom} — ${attaque.nom} : ${r.jet.describe()}${bonus}`, 'jet');
 
+  const detail = r.absorbe > 0 ? ` (${r.brut} − ${r.absorbe} d'armure)` : '';
   const subis = blesser(run.personnage, r.degats);
   noter(
     run,

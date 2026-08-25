@@ -7,7 +7,7 @@
  */
 
 import { el, vider, visuelManquant } from './dom.js';
-import { RENCONTRES } from '../data/monde.js';
+
 import * as Run from '../systems/run.js';
 import { ciblesDisponibles } from '../systems/competences.js';
 import { vueInventaire } from './vue-inventaire.js';
@@ -50,7 +50,7 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
       el('span', { class: `pv${info.pv <= info.pvMax / 3 ? ' bas' : ''}`, text: `${info.pv}/${info.pvMax} PV` }),
       el('div', { class: 'jauge' }, [el('i', { style: { width: `${(info.pv / info.pvMax) * 100}%` } })]),
       el('span', { class: 'armure', text: `${info.armure} armure` }),
-      el('span', { class: 'piece', text: `Pièce ${info.piece.piece}/${info.piece.total}` }),
+      el('span', { class: 'piece', text: `Étage ${info.piece.etage} · pièce ${info.piece.piece}/${info.piece.total}` }),
     ]);
 
     let contenu;
@@ -58,7 +58,7 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
       contenu = el('div', {}, [
         visuelManquant(combat.ennemi.nom, combat.ennemi.icone),
         el('div', { class: 'hud statique' }, [
-          combat.ennemi.niveau ? el('span', { class: 'niveau', text: `Niv. ${combat.ennemi.niveau}` }) : null,
+          combat.ennemi.rang ? el('span', { class: 'niveau', text: `Rang ${combat.ennemi.rang}` + (combat.ennemi.variante > 1 ? ` · V${combat.ennemi.variante}` : '') }) : null,
           el('span', { text: `${combat.ennemi.pv}/${combat.ennemi.pvMax} PV` }),
           el('div', { class: 'jauge ennemi' }, [
             el('i', { style: { width: `${(combat.ennemi.pv / combat.ennemi.pvMax) * 100}%` } }),
@@ -67,7 +67,13 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
         ]),
       ]);
     } else if (run.phase === Run.PHASES.FIN) {
-      contenu = visuelManquant(run.issue === 'mort' ? 'Mort du personnage' : 'Fin du parcours');
+      contenu = visuelManquant(
+        run.issue === 'mort' ? 'Mort du personnage'
+        : run.issue === 'arrete' ? 'Retour à la surface'
+        : 'Fin du donjon'
+      );
+    } else if (run.phase === Run.PHASES.FIN_ETAGE) {
+      contenu = visuelManquant(`Escalier vers l'étage ${run.etage + 1}`);
     } else {
       contenu = visuelManquant(piece ? piece.visuel : 'Lieu');
     }
@@ -106,7 +112,9 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
 
       // Les pièces précédentes sont repliées pour garder le cadre lisible.
       const ouvert = piecesDepliees.has(index);
-      const titre = RENCONTRES[groupe.piece]?.lieu ?? 'Passage';
+      const titre = groupe.entrees.find((e) => e.type === 'lieu')?.texte.replace(/^— | —$/g, '')
+        ?? groupe.entrees.find((e) => e.type === 'etage')?.texte
+        ?? 'Passage';
       const bloc = el('details', { class: 'piece-repliee', open: ouvert }, [
         el('summary', { text: titre }),
         ...lignes,
@@ -142,6 +150,24 @@ export function ecranJeu({ personnage, graine, onTerminer }) {
       zoneActions.append(
         el('div', { class: 'rangee' }, [
           el('button', { class: 'primaire', text: 'Terminer la run', onclick: () => onTerminer(run) }),
+        ])
+      );
+      return;
+    }
+
+    if (run.phase === Run.PHASES.FIN_ETAGE) {
+      zoneActions.append(
+        el('p', {
+          class: 'note',
+          text: `Étage ${run.etage} terminé. Descendre augmente la difficulté ; s'arrêter met fin à la run.`,
+        }),
+        el('div', { class: 'rangee' }, [
+          el('button', {
+            class: 'primaire',
+            text: `Descendre à l'étage ${run.etage + 1}`,
+            onclick: () => Run.descendre(run),
+          }),
+          el('button', { text: 'Arrêter la run', onclick: () => Run.arreterLaRun(run) }),
         ])
       );
       return;

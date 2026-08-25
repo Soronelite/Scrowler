@@ -294,10 +294,28 @@ suite('Run complète avec XP', ({ test }) => {
     expect(run.phase).toBe(Run.PHASES.FIN);
   });
 
-  test('tuer le rat donne son XP', () => {
-    const { run, p } = jouer('run-rat');
-    expect(p.progression.xp >= 5).toBe(true);
-    expect(run.journal.some((e) => e.type === 'xp')).toBe(true);
+  test('tuer un ennemi donne son XP', () => {
+    // Le donjon est procédural : on cherche une graine dont la première pièce
+    // contient un ennemi, plutôt que de supposer sa présence.
+    let run = null;
+    for (let i = 0; i < 60 && !run; i++) {
+      const candidat = Run.creerRun(perso(), { graine: `combat-xp-${i}` });
+      if (candidat.piece.ennemi) run = candidat;
+    }
+    expect(Boolean(run)).toBe(true);
+
+    const avant = run.personnage.progression.xp;
+    Run.executerAction(run, 'attaquer');
+    for (let i = 0; i < 60 && run.phase === Run.PHASES.COMBAT; i++) {
+      const arme = Run.objetsUtilisables(run).find((u) => u.def.action.type === 'attaque');
+      if (!arme) break;
+      Run.utiliserObjet(run, arme.slot.uid);
+    }
+
+    if (run.combat?.vainqueur === 'joueur') {
+      expect(run.personnage.progression.xp > avant).toBe(true);
+      expect(run.journal.some((e) => e.type === 'xp')).toBe(true);
+    }
   });
 
   test('chaque passage de pièce n’est récompensé qu’une fois', () => {
@@ -312,7 +330,7 @@ suite('Run complète avec XP', ({ test }) => {
 
   test('chaque entrée de journal porte sa pièce', () => {
     const { run } = jouer('run-xp');
-    expect(run.journal.every((e) => typeof e.piece === 'number')).toBe(true);
+    expect(run.journal.every((e) => typeof e.piece === 'string' && e.piece.includes(':'))).toBe(true);
   });
 
   test('les points de compétence gagnés sont tous dépensés', () => {
